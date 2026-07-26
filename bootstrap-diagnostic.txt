@@ -1,33 +1,12 @@
-fb3ce902d97ae0cc1492526f94545ef6f2ae47808379eb54f04eb81d356d3847  .bootstrap/chunk00
-1365ceaa891cbb5e186fcd27667caedc70c114e26ee2c26b7a093e2c55aafc68  .bootstrap/chunk01
-db16e1235ac7f04d25162388ca1de7c96d148da5d977ce1b9b62097b82957760  /tmp/chunk01b
-db16e1235ac7f04d25162388ca1de7c96d148da5d977ce1b9b62097b82957760  .bootstrap/chunk02
-65d19d3c864001442ea4a627cfb43ccb66d3070191688ae5be5be6a4061cedc0  .bootstrap/chunk03
-5e77de5c1551228802ac3de16607263aad010064299edc43f53486796c865b5e  .bootstrap/chunk04
-837f203434aae2d7e8c61f2718d5b54732cfe1111203c9fde80cb6edfd180cc5  .bootstrap/chunk05
-4b5a5492f9a5cfa9bb70968e1742700c64ec414d4e6c6fa588cc950c063b95ca  .bootstrap/chunk07
-daea40054ba7b62bfca0a1b8a32bfa297af75cf1b02a939c40f06002e4726bc8  .bootstrap/chunk08
-9c783f922c99d442a839132b14115a1bfa5cf0db523abaa76ed50a9f26d303d0  .bootstrap/chunk09a
-fa877f7fac99c7887ee64f20977a04ba25486260c266981192efd7810df4b234  .bootstrap/chunk09b
-1e34b3edc9122f6285cf342e6099922f2f8573b3e50c9ba4b652e4ed83ddee90  .bootstrap/chunk09c
-ef8c33f1fdbc4cb9bd5d38f87bd519696149fbc9c543428d23f0806e6ac6afbe  .bootstrap/chunk09d
- 20000 .bootstrap/chunk00
- 10000 .bootstrap/chunk01
- 10000 /tmp/chunk01b
- 10000 .bootstrap/chunk02
- 10000 .bootstrap/chunk03
- 10000 .bootstrap/chunk04
- 10000 .bootstrap/chunk05
- 10000 .bootstrap/chunk07
- 10000 .bootstrap/chunk08
-  2500 .bootstrap/chunk09a
-  2500 .bootstrap/chunk09b
-  2500 .bootstrap/chunk09c
-  1740 .bootstrap/chunk09d
-109240 total
+expected_chunk00a=8d2edfec7e96d428d112f788f2b95f5d5e0931852f5162be36501ed8c592c0b6
+expected_chunk00b=a99f45f9bc5508e1f91adafded0733ac9c99d9ae10f5feaec5b17ed1ee996f68
+expected_chunk06a=8e6603c2757916a7d1b07cf1da5ea70a706247413d2ce33fd4c9742748096069
+8d2edfec7e96d428d112f788f2b95f5d5e0931852f5162be36501ed8c592c0b6  /tmp/chunk00a
+7fa7dd9ccfc955de637751106826c7053d6d36c9a3d61a280c86e322f1f8be4a  /tmp/chunk00b
+42cbd497fc7f959b0e6d1392fbd1a19a5ab6ac484a65f5e6eb44ef3cc064186d  /tmp/chunk06a
 base64_bytes=109240
 decode_status=0
-actual_sha256=3f70d3d0dba314ffa05c81ebf9cabf716a2f383bbea9a60b380dd40d398eb148
+actual_sha256=a874491fe7acee7ecd5fe28be75d5da9d364d680de59678453784ed99931ecee
 expected_sha256=c1af393010663b43f138a4ab683ea4c0c819b0dffa58968b92a481f86bb1190c
 Archive:  /tmp/football-director-source.zip
     testing: tests/                   OK
@@ -60,18 +39,17 @@ Archive:  /tmp/football-director-source.zip
     testing: src/core/                OK
     testing: src/core/utils.js        OK
     testing: src/core/random.js       OK
-    testing: src/styles.css          
-  error:  invalid compressed data to inflate
-file #32:  bad zipfile offset (local header sig):  31227
-file #33:  bad zipfile offset (local header sig):  31292
-file #34:  bad zipfile offset (local header sig):  33090
-file #35:  bad zipfile offset (local header sig):  36692
-file #36:  bad zipfile offset (local header sig):  48901
-file #37:  bad zipfile offset (local header sig):  48968
-file #38:  bad zipfile offset (local header sig):  53173
-file #39:  bad zipfile offset (local header sig):  53240
-file #40:  bad zipfile offset (local header sig):  54828
-file #41:  bad zipfile offset (local header sig):  56583
+    testing: src/styles.css           OK
+    testing: src/ui/                  OK
+    testing: src/ui/templates.js      OK
+    testing: src/ui/controller.js     OK
+    testing: src/ui/render.js         OK
+    testing: src/data/                OK
+    testing: src/data/catalog.js      OK
+    testing: src/game/                OK
+    testing: src/game/transfers.js    OK
+    testing: src/game/development.js   OK
+    testing: src/game/game-engine.js   bad CRC f8c3233d  (should be f82cab3d)
     testing: src/game/squad.js        OK
     testing: src/game/fixtures.js     OK
     testing: src/game/save.js         OK
