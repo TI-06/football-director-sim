@@ -120,9 +120,18 @@ export function renderNewGame() {
   </main>`;
 }
 
-function appShell(state, currentView, content) {
+function autoAdvanceControl(state, uiState = {}, compact = false) {
+  if (state.seasonStatus !== 'active') return '';
+  const active = Boolean(uiState.autoAdvanceActive);
+  return `<button class="btn ${active ? 'btn--danger' : compact ? 'btn--secondary' : 'btn--ghost'} ${compact ? 'btn--sm' : ''}" type="button" data-command="toggle-auto-advance" aria-pressed="${active}">${icon(active ? 'pause' : 'play', compact ? 15 : 17)}<span>${active ? '自動進行を停止' : '自動進行'}</span></button>`;
+}
+
+function appShell(state, currentView, content, uiState = {}) {
   const club = userClub(state);
   const [title] = PAGE_META[currentView] ?? PAGE_META.dashboard;
+  const autoMessage = uiState.autoAdvanceMessage
+    ? `<div class="auto-advance-status ${uiState.autoAdvanceActive ? 'is-active' : ''}" role="status">${icon('pulse', 14)}<span>${escapeHtml(uiState.autoAdvanceMessage)}</span></div>`
+    : '';
   return `<div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar__brand"><span class="sidebar__brand-mark">FD</span><div><strong>Football Director</strong><small>CAREER MODE</small></div></div>
@@ -136,10 +145,11 @@ function appShell(state, currentView, content) {
     </aside>
     <div class="main-shell">
       <header class="topbar">
-        <div class="topbar__context"><small>SEASON ${state.season} · WEEK ${Math.min(state.week, 14)}</small><h1>${escapeHtml(title)}</h1></div>
+        <div class="topbar__context"><small>SEASON ${state.season} · WEEK ${Math.min(state.week, 14)}</small><h1>${escapeHtml(title)}</h1>${autoMessage}</div>
         <div class="topbar__actions">
           <div class="date-chip">${icon('calendar', 16)} ${escapeHtml(state.currentDate)}</div>
-          <button class="btn btn--primary" type="button" data-command="${state.seasonStatus === 'active' ? 'play-week' : 'start-next-season'}">${icon(state.seasonStatus === 'active' ? 'play' : 'trophy', 17)}<span>${state.seasonStatus === 'active' ? '次の試合へ' : '次シーズンを開始'}</span></button>
+          ${autoAdvanceControl(state, uiState)}
+          <button class="btn btn--primary" type="button" data-command="${state.seasonStatus === 'active' ? 'play-week' : 'start-next-season'}" ${uiState.autoAdvanceActive ? 'disabled' : ''}>${icon(state.seasonStatus === 'active' ? 'play' : 'trophy', 17)}<span>${state.seasonStatus === 'active' ? '次の試合へ' : '次シーズンを開始'}</span></button>
         </div>
       </header>
       <main class="content">${content}</main>
@@ -153,7 +163,7 @@ function pageHeader(view, action = '') {
   return `<div class="page-header"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${action ? `<div class="page-header__actions">${action}</div>` : ''}</div>`;
 }
 
-function renderDashboard(state) {
+function renderDashboard(state, uiState = {}) {
   const club = userClub(state);
   const metrics = overallSquadMetrics(state);
   const position = currentPosition(state);
@@ -183,7 +193,7 @@ function renderDashboard(state) {
       </div>
       <div class="next-match__footer">
         <div class="opponent-scout"><div>相手平均OVR<strong>${opponentOverall}</strong></div><div>基本戦術<strong>${escapeHtml(opponent.tactics.formation)} / ${escapeHtml(opponent.style)}</strong></div><div>自軍フォーム<strong>${formDots(form)}</strong></div></div>
-        <button class="btn btn--primary" type="button" data-command="play-week">${icon('play', 17)} 試合を開始</button>
+        <div class="next-match__actions">${autoAdvanceControl(state, uiState, true)}<button class="btn btn--primary" type="button" data-command="play-week" ${uiState.autoAdvanceActive ? 'disabled' : ''}>${icon('play', 17)} 試合を開始</button></div>
       </div>
     </article>`;
   }
@@ -210,32 +220,53 @@ function renderDashboard(state) {
     </section>`;
 }
 
+function roleBadges(state, playerId) {
+  const badges = [];
+  if (state.lineup.captainId === playerId) badges.push('<span class="role-badge role-badge--captain" title="キャプテン">C</span>');
+  if (state.lineup.penaltyTakerId === playerId) badges.push('<span class="role-badge role-badge--penalty" title="PKキッカー">PK</span>');
+  return badges.join('');
+}
+
 function lineupPitch(state) {
   const players = userPlayers(state);
-  const formation = FORMATIONS[state.tactics.formation];
-  return `<div class="card"><div class="card__header"><div><h3>先発フォーメーション</h3><p>${escapeHtml(state.tactics.formation)} · 戦術理解 ${state.tactics.familiarity}%</p></div><button class="btn btn--secondary btn--sm" type="button" data-action="auto-lineup">自動編成</button></div>
+  const captain = players.find((player) => player.id === state.lineup.captainId);
+  const penaltyTaker = players.find((player) => player.id === state.lineup.penaltyTakerId);
+  return `<div class="card"><div class="card__header"><div><h3>先発フォーメーション</h3><p>${escapeHtml(state.tactics.formation)} · 選手カードをドラッグして配置変更</p></div><button class="btn btn--secondary btn--sm" type="button" data-action="auto-lineup">自動編成</button></div>
     <div class="card__body"><div class="pitch"><span class="pitch-box pitch-box--top"></span><span class="pitch-box pitch-box--bottom"></span>
       ${state.lineup.starters.map((entry) => {
         const selected = players.find((player) => player.id === entry.playerId);
         const candidates = players
           .filter((player) => player.injuryWeeks <= 0 && !player.suspended)
           .sort((a, b) => playerSlotScore(b, entry.slotPosition) - playerSlotScore(a, entry.slotPosition));
-        return `<div class="pitch-slot" style="left:${entry.x}%;top:${entry.y}%"><div class="pitch-player"><div class="pitch-player__top"><span class="pitch-player__pos">${entry.slotPosition}</span><span class="pitch-player__rating">${selected?.overall ?? '–'}</span></div><select aria-label="${entry.slotPosition}の選手" data-lineup-slot="${entry.slotId}">${candidates.map((player) => `<option value="${player.id}" ${player.id === entry.playerId ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select></div></div>`;
+        return `<div class="pitch-slot" style="left:${entry.x}%;top:${entry.y}%" data-drop-slot="${entry.slotId}" data-slot-position="${entry.slotPosition}"><div class="pitch-player" draggable="true" data-drag-player="${selected?.id ?? ''}" data-source-slot="${entry.slotId}" tabindex="0" aria-label="${escapeHtml(selected?.name ?? '未設定')}をドラッグ"><div class="pitch-player__top"><span class="pitch-player__pos">${entry.slotPosition}</span><span class="pitch-player__roles">${roleBadges(state, entry.playerId)}</span><span class="pitch-player__rating">${selected?.overall ?? '–'}</span></div><strong class="pitch-player__name">${escapeHtml(selected?.name ?? '未設定')}</strong><select class="pitch-player__select" aria-label="${entry.slotPosition}の選手" data-lineup-slot="${entry.slotId}">${candidates.map((player) => `<option value="${player.id}" ${player.id === entry.playerId ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select></div></div>`;
       }).join('')}
     </div></div>
-    <div class="pitch-legend"><div>キャプテン<strong>${escapeHtml(players.find((player) => player.id === state.lineup.captainId)?.name ?? '未設定')}</strong></div><div>PKキッカー<strong>${escapeHtml(players.find((player) => player.id === state.lineup.penaltyTakerId)?.name ?? '未設定')}</strong></div><div>控え<strong>${state.lineup.bench.length}名</strong></div></div>
+    <div class="role-summary"><div class="role-summary__item"><span class="role-badge role-badge--captain">C</span><span>キャプテン<strong>${escapeHtml(captain?.name ?? '未設定')}</strong><small>${captain ? `${captain.position} · OVR ${captain.overall}` : '先発から選択'}</small></span></div><div class="role-summary__item"><span class="role-badge role-badge--penalty">PK</span><span>PKキッカー<strong>${escapeHtml(penaltyTaker?.name ?? '未設定')}</strong><small>${penaltyTaker ? `${penaltyTaker.position} · OVR ${penaltyTaker.overall}` : '先発から選択'}</small></span></div><div class="role-summary__item"><span class="role-summary__count">${state.lineup.bench.length}</span><span>控え登録<strong>${state.lineup.bench.length}名</strong><small>表からドラッグ可能</small></span></div></div>
   </div>`;
 }
 
 function playerTable(state) {
-  const players = userPlayers(state).sort((a, b) => a.position.localeCompare(b.position) || b.overall - a.overall);
+  const players = [...userPlayers(state)].sort((a, b) => a.position.localeCompare(b.position) || b.overall - a.overall);
   const starterIds = new Set(state.lineup.starters.map((entry) => entry.playerId));
   const benchIds = new Set(state.lineup.bench);
-  return `<article class="card"><div class="card__header"><div><h3>トップチーム</h3><p>${players.length}名 · 先発11名 / 控え${state.lineup.bench.length}名</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>選手</th><th>役割</th><th>OVR</th><th>POT</th><th>状態</th><th>体力</th><th>士気</th><th>給与</th><th>契約</th><th>操作</th></tr></thead><tbody>
+  const positions = [...new Set(players.map((player) => player.position))].sort();
+  return `<article class="card"><div class="card__header"><div><h3>トップチーム</h3><p>${players.length}名 · 先発11名 / 控え${state.lineup.bench.length}名</p></div></div>
+    <div class="squad-controls" aria-label="選手一覧の並べ替えと絞り込み">
+      <label><span>並び順</span><select class="control-select" data-squad-sort><option value="role">起用状況</option><option value="position">ポジション</option><option value="overall">総合値 OVR</option><option value="potential">ポテンシャル</option><option value="fitness">体力</option><option value="morale">士気</option><option value="age">年齢</option><option value="wage">給与</option><option value="name">名前</option></select></label>
+      <label><span>方向</span><select class="control-select" data-squad-order><option value="desc">高い順 / 優先順</option><option value="asc">低い順 / 逆順</option></select></label>
+      <label><span>起用</span><select class="control-select" data-squad-role-filter><option value="">すべて</option><option value="starter">先発</option><option value="bench">控え</option><option value="outside">登録外</option></select></label>
+      <label><span>ポジション</span><select class="control-select" data-squad-position-filter><option value="">すべて</option>${positions.map((position) => `<option value="${position}">${position}</option>`).join('')}</select></label>
+    </div>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th aria-label="ドラッグ"></th><th>選手</th><th>役割</th><th>OVR</th><th>POT</th><th>状態</th><th>体力</th><th>士気</th><th>給与</th><th>契約</th><th>操作</th></tr></thead><tbody data-squad-table-body>
     ${players.map((player) => {
-      const role = starterIds.has(player.id) ? '先発' : benchIds.has(player.id) ? '控え' : '登録外';
+      const roleKey = starterIds.has(player.id) ? 'starter' : benchIds.has(player.id) ? 'bench' : 'outside';
+      const role = roleKey === 'starter' ? '先発' : roleKey === 'bench' ? '控え' : '登録外';
+      const roleRank = roleKey === 'starter' ? 3 : roleKey === 'bench' ? 2 : 1;
+      const available = player.injuryWeeks <= 0 && !player.suspended;
+      const isCaptain = state.lineup.captainId === player.id;
+      const isPenalty = state.lineup.penaltyTakerId === player.id;
       const status = player.injuryWeeks > 0 ? `<span class="status-tag status-tag--injured">負傷 ${player.injuryWeeks}週</span>` : player.suspended ? '<span class="status-tag status-tag--injured">出場停止</span>' : player.listed ? '<span class="status-tag status-tag--listed">売却候補</span>' : '<span class="status-tag">起用可</span>';
-      return `<tr data-squad-player="${player.id}"><td><span class="player-name"><span class="player-avatar">${escapeHtml(player.name.split(' ').map((part) => part[0]).join('').slice(0,2))}</span><span><strong>${escapeHtml(player.name)}</strong><span>${player.age}歳 · ${player.appearances}試合 ${player.goals}得点</span></span></span></td><td><span class="position-tag">${player.position}</span> ${role}</td><td><span class="rating-number">${player.overall}</span></td><td>${player.potential}</td><td>${status}</td><td>${player.fitness}${progressBar(player.fitness, '体力', player.fitness < 50 ? 'danger' : player.fitness < 70 ? 'warning' : 'accent')}</td><td>${player.morale}${progressBar(player.morale, '士気', player.morale < 50 ? 'danger' : 'accent')}</td><td>${money(player.wage)}</td><td>${player.contractYears}年</td><td><div class="actions"><button class="btn btn--ghost btn--sm" type="button" data-action="set-captain" data-player-id="${player.id}" ${!starterIds.has(player.id) ? 'disabled' : ''}>主将</button><button class="btn btn--ghost btn--sm" type="button" data-action="set-penalty" data-player-id="${player.id}" ${!starterIds.has(player.id) ? 'disabled' : ''}>PK</button><button class="btn ${player.listed ? 'btn--danger' : 'btn--ghost'} btn--sm" type="button" data-action="list-player" data-player-id="${player.id}">${player.listed ? '解除' : '売却候補'}</button>${player.listed ? `<button class="btn btn--secondary btn--sm" type="button" data-action="sell-player" data-player-id="${player.id}">売却交渉</button>` : ''}<button class="btn btn--ghost btn--sm" type="button" data-action="release-player" data-player-id="${player.id}" title="補償金: ${money(player.wage * 12)}">契約解除</button></div></td></tr>`;
+      return `<tr data-squad-player="${player.id}" data-drag-player="${player.id}" draggable="${available}" data-name="${escapeHtml(player.name.toLowerCase())}" data-position="${player.position}" data-role="${roleKey}" data-role-rank="${roleRank}" data-overall="${player.overall}" data-potential="${player.potential}" data-fitness="${player.fitness}" data-morale="${player.morale}" data-age="${player.age}" data-wage="${player.wage}" class="${available ? 'is-draggable' : 'is-unavailable'}"><td><span class="drag-handle" title="フォーメーションへドラッグ" aria-hidden="true">⋮⋮</span></td><td><span class="player-name"><span class="player-avatar">${escapeHtml(player.name.split(' ').map((part) => part[0]).join('').slice(0,2))}</span><span><strong>${escapeHtml(player.name)}</strong><span>${player.age}歳 · ${player.appearances}試合 ${player.goals}得点</span></span></span></td><td><span class="position-tag">${player.position}</span> <span class="selection-role">${role}</span>${roleBadges(state, player.id)}</td><td><span class="rating-number">${player.overall}</span></td><td>${player.potential}</td><td>${status}</td><td>${player.fitness}${progressBar(player.fitness, '体力', player.fitness < 50 ? 'danger' : player.fitness < 70 ? 'warning' : 'accent')}</td><td>${player.morale}${progressBar(player.morale, '士気', player.morale < 50 ? 'danger' : 'accent')}</td><td>${money(player.wage)}</td><td>${player.contractYears}年</td><td><div class="actions"><button class="btn ${isCaptain ? 'btn--selected' : 'btn--ghost'} btn--sm" type="button" data-action="set-captain" data-player-id="${player.id}" aria-pressed="${isCaptain}" ${!starterIds.has(player.id) ? 'disabled' : ''}>主将${isCaptain ? ' ✓' : ''}</button><button class="btn ${isPenalty ? 'btn--selected' : 'btn--ghost'} btn--sm" type="button" data-action="set-penalty" data-player-id="${player.id}" aria-pressed="${isPenalty}" ${!starterIds.has(player.id) ? 'disabled' : ''}>PK${isPenalty ? ' ✓' : ''}</button><button class="btn ${player.listed ? 'btn--danger' : 'btn--ghost'} btn--sm" type="button" data-action="list-player" data-player-id="${player.id}">${player.listed ? '解除' : '売却候補'}</button>${player.listed ? `<button class="btn btn--secondary btn--sm" type="button" data-action="sell-player" data-player-id="${player.id}">売却交渉</button>` : ''}<button class="btn btn--ghost btn--sm" type="button" data-action="release-player" data-player-id="${player.id}" title="補償金: ${money(player.wage * 12)}">契約解除</button></div></td></tr>`;
     }).join('')}
   </tbody></table></div></article>`;
 }
@@ -362,7 +393,7 @@ function renderInbox(state) {
   }).join('') : emptyState('受信トレイは空です', '試合週を進めるとクラブ内外から連絡が届きます。')}</div>`;
 }
 
-function renderView(state, currentView) {
+function renderView(state, currentView, uiState = {}) {
   switch (currentView) {
     case 'squad': return renderSquad(state);
     case 'tactics': return renderTactics(state);
@@ -371,12 +402,12 @@ function renderView(state, currentView) {
     case 'academy': return renderAcademy(state);
     case 'club': return renderClub(state);
     case 'inbox': return renderInbox(state);
-    default: return renderDashboard(state);
+    default: return renderDashboard(state, uiState);
   }
 }
 
-export function renderApplication(state, currentView = 'dashboard') {
-  return appShell(state, currentView, renderView(state, currentView));
+export function renderApplication(state, currentView = 'dashboard', uiState = {}) {
+  return appShell(state, currentView, renderView(state, currentView, uiState), uiState);
 }
 
 function eventIcon(type) {
