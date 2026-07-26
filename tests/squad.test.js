@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRng } from '../src/core/random.js';
 import { generateLeague } from '../src/data/catalog.js';
-import { selectBestLineup, validateLineup, lineupRating } from '../src/game/squad.js';
+import { selectBestLineup, validateLineup, lineupRating, replaceStarter } from '../src/game/squad.js';
 
 const league = generateLeague(createRng('squad-test'));
 const club = league.clubs[0];
@@ -38,4 +38,32 @@ test('playing players in compatible positions rates higher', () => {
   [goalkeeper.playerId, striker.playerId] = [striker.playerId, goalkeeper.playerId];
   const bad = lineupRating(players, swapped, '4-4-2');
   assert.ok(good > bad + 5);
+});
+
+test('replacing a role holder keeps captain and penalty assignments on starters', () => {
+  const lineup = selectBestLineup(players, '4-2-3-1');
+  const roleHolderId = lineup.captainId;
+  lineup.penaltyTakerId = roleHolderId;
+  const roleHolderSlot = lineup.starters.find((entry) => entry.playerId === roleHolderId);
+  const incomingId = lineup.bench[0];
+
+  const changed = replaceStarter(lineup, roleHolderSlot.slotId, incomingId, players, '4-2-3-1');
+  const starterIds = new Set(changed.starters.map((entry) => entry.playerId));
+
+  assert.equal(changed.starters.length, 11);
+  assert.equal(starterIds.size, 11);
+  assert.equal(starterIds.has(changed.captainId), true);
+  assert.equal(starterIds.has(changed.penaltyTakerId), true);
+  assert.equal(changed.captainId, incomingId);
+  assert.equal(changed.penaltyTakerId, incomingId);
+});
+
+test('dropping one starter onto another slot swaps them without duplicates', () => {
+  const lineup = selectBestLineup(players, '4-3-3');
+  const [first, second] = lineup.starters.slice(1, 3);
+  const changed = replaceStarter(lineup, second.slotId, first.playerId, players, '4-3-3');
+
+  assert.equal(changed.starters.find((entry) => entry.slotId === first.slotId).playerId, second.playerId);
+  assert.equal(changed.starters.find((entry) => entry.slotId === second.slotId).playerId, first.playerId);
+  assert.equal(new Set(changed.starters.map((entry) => entry.playerId)).size, 11);
 });

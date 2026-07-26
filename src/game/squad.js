@@ -114,6 +114,8 @@ export function replaceStarter(lineup, slotId, playerId, players, formationId) {
     next.bench = next.bench.filter((id) => id !== playerId);
     if (oldPlayer) next.bench.unshift(oldPlayer);
     next.bench = next.bench.slice(0, 7);
+    if (next.captainId === oldPlayer) next.captainId = playerId;
+    if (next.penaltyTakerId === oldPlayer) next.penaltyTakerId = playerId;
   }
   const formation = FORMATIONS[formationId] ?? FORMATIONS['4-2-3-1'];
   for (const entry of next.starters) {

@@ -1,12 +1,27 @@
 import { createNewGame, performAction, playNextWeek } from '../game/game-engine.js';
 import { deserializeGame, serializeGame } from '../game/save.js';
+import { autoAdvanceStopReason, unresolvedDecisionIds } from './auto-advance.js';
 import { renderApplication, renderMatchModal, renderNewGame } from './render.js';
+import { compareSquadRows, matchesSquadFilters } from './squad-controls.js';
 
 const STORAGE_KEY = 'football-director-save-v1';
+const AUTO_ADVANCE_DELAY = 650;
 
 let state = null;
 let currentView = 'dashboard';
 let matchTimer = null;
+let autoAdvanceTimer = null;
+let autoAdvanceActive = false;
+let autoAdvanceMessage = '';
+let draggedPlayerId = null;
+let draggedElement = null;
+
+const squadViewState = {
+  sort: 'role',
+  order: 'desc',
+  role: '',
+  position: ''
+};
 
 function elements() {
   return {
@@ -39,8 +54,11 @@ function persist() {
 
 function render() {
   const { app } = elements();
-  app.innerHTML = state ? renderApplication(state, currentView) : renderNewGame();
+  app.innerHTML = state
+    ? renderApplication(state, currentView, { autoAdvanceActive, autoAdvanceMessage })
+    : renderNewGame();
   document.title = state ? `${state.clubs.find((club) => club.id === state.userClubId)?.name ?? 'Football Director'} | Football Director` : 'Football Director';
+  if (state && currentView === 'squad') applySquadFilters(false);
 }
 
 function notify(message, type = 'success') {
@@ -52,7 +70,26 @@ function notify(message, type = 'success') {
   window.setTimeout(() => toast.remove(), 3200);
 }
 
+function clearAutoAdvanceTimer() {
+  if (autoAdvanceTimer) window.clearTimeout(autoAdvanceTimer);
+  autoAdvanceTimer = null;
+}
+
+function cancelAutoAdvance(message = '') {
+  clearAutoAdvanceTimer();
+  autoAdvanceActive = false;
+  autoAdvanceMessage = message;
+}
+
+function stopAutoAdvance(message, { notifyUser = false, navigateToInbox = false, type = 'success' } = {}) {
+  cancelAutoAdvance(message);
+  if (navigateToInbox) currentView = 'inbox';
+  render();
+  if (notifyUser) notify(message, type);
+}
+
 function applyAction(type, payload = {}) {
+  if (autoAdvanceActive) cancelAutoAdvance('操作により自動進行を停止しました。');
   const result = performAction(state, { type, payload });
   if (!result.ok) {
     notify(result.message, 'error');
@@ -82,6 +119,7 @@ function exportSave() {
 
 async function importSave(file) {
   try {
+    cancelAutoAdvance();
     const next = deserializeGame(await file.text());
     state = next;
     currentView = 'dashboard';
@@ -160,15 +198,75 @@ function closeMatch() {
 
 function playWeek() {
   if (!state) return;
+  if (autoAdvanceActive) cancelAutoAdvance();
   const result = playNextWeek(state);
   if (!result.ok) {
     notify(result.message, 'error');
     return;
   }
   state = result.state;
+  autoAdvanceMessage = '';
   persist();
   render();
   if (result.matchReport) openMatch(result.matchReport, false);
+}
+
+function runAutoAdvanceStep() {
+  if (!autoAdvanceActive || !state) return;
+  const week = state.week;
+  const decisionsBefore = new Set(unresolvedDecisionIds(state));
+  autoAdvanceMessage = `WEEK ${week}を自動進行中`;
+  render();
+
+  const result = playNextWeek(state);
+  if (!result.ok) {
+    stopAutoAdvance(result.message, { notifyUser: true, type: 'error' });
+    return;
+  }
+
+  state = result.state;
+  persist();
+  const stopReason = autoAdvanceStopReason(decisionsBefore, state);
+  if (stopReason === 'decision' || stopReason === 'pending-decision') {
+    stopAutoAdvance(`WEEK ${week}の試合後に判断イベントが発生しました。`, { notifyUser: true, navigateToInbox: true });
+    return;
+  }
+  if (stopReason === 'season-complete') {
+    stopAutoAdvance(`シーズン${state.season}の全試合が終了しました。`, { notifyUser: true });
+    return;
+  }
+
+  autoAdvanceMessage = `WEEK ${week}完了。次の試合を準備しています。`;
+  render();
+  autoAdvanceTimer = window.setTimeout(runAutoAdvanceStep, AUTO_ADVANCE_DELAY);
+}
+
+function startAutoAdvance() {
+  if (!state || state.seasonStatus !== 'active') {
+    notify('進行できるシーズンがありません。', 'error');
+    return;
+  }
+  if (unresolvedDecisionIds(state).length) {
+    currentView = 'inbox';
+    autoAdvanceMessage = '未処理の判断イベントを解決すると自動進行できます。';
+    render();
+    notify(autoAdvanceMessage, 'error');
+    return;
+  }
+  closeMatch();
+  clearAutoAdvanceTimer();
+  autoAdvanceActive = true;
+  autoAdvanceMessage = `WEEK ${state.week}から自動進行を開始します。`;
+  render();
+  autoAdvanceTimer = window.setTimeout(runAutoAdvanceStep, 180);
+}
+
+function toggleAutoAdvance() {
+  if (autoAdvanceActive) {
+    stopAutoAdvance('自動進行を停止しました。', { notifyUser: true });
+  } else {
+    startAutoAdvance();
+  }
 }
 
 function filterMarket() {
@@ -179,6 +277,83 @@ function filterMarket() {
     const positionMatches = !position || row.dataset.position === position;
     row.hidden = !(nameMatches && positionMatches);
   });
+}
+
+function applySquadFilters(readControls = true) {
+  const body = document.querySelector('[data-squad-table-body]');
+  if (!body) return;
+  const sortControl = document.querySelector('[data-squad-sort]');
+  const orderControl = document.querySelector('[data-squad-order]');
+  const roleControl = document.querySelector('[data-squad-role-filter]');
+  const positionControl = document.querySelector('[data-squad-position-filter]');
+
+  if (readControls) {
+    squadViewState.sort = sortControl?.value ?? squadViewState.sort;
+    squadViewState.order = orderControl?.value ?? squadViewState.order;
+    squadViewState.role = roleControl?.value ?? squadViewState.role;
+    squadViewState.position = positionControl?.value ?? squadViewState.position;
+  } else {
+    if (sortControl) sortControl.value = squadViewState.sort;
+    if (orderControl) orderControl.value = squadViewState.order;
+    if (roleControl) roleControl.value = squadViewState.role;
+    if (positionControl) positionControl.value = squadViewState.position;
+  }
+
+  const rows = [...body.querySelectorAll('[data-squad-player]')];
+  rows.sort((left, right) => compareSquadRows(left, right, squadViewState.sort, squadViewState.order));
+  for (const row of rows) {
+    row.hidden = !matchesSquadFilters(row, { role: squadViewState.role, position: squadViewState.position });
+    body.append(row);
+  }
+}
+
+function clearDragState() {
+  if (draggedElement) draggedElement.classList.remove('is-dragging');
+  document.querySelectorAll('[data-drop-slot]').forEach((slot) => slot.classList.remove('is-drop-ready', 'is-drag-over'));
+  draggedPlayerId = null;
+  draggedElement = null;
+}
+
+function handleDragStart(event) {
+  if (event.target.closest('button, input, select')) {
+    event.preventDefault();
+    return;
+  }
+  const source = event.target.closest('[data-drag-player][draggable="true"]');
+  if (!source) return;
+  draggedPlayerId = source.dataset.dragPlayer;
+  draggedElement = source;
+  source.classList.add('is-dragging');
+  document.querySelectorAll('[data-drop-slot]').forEach((slot) => slot.classList.add('is-drop-ready'));
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', draggedPlayerId);
+}
+
+function handleDragOver(event) {
+  const slot = event.target.closest('[data-drop-slot]');
+  if (!slot || !draggedPlayerId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('[data-drop-slot].is-drag-over').forEach((item) => {
+    if (item !== slot) item.classList.remove('is-drag-over');
+  });
+  slot.classList.add('is-drag-over');
+}
+
+function handleDragLeave(event) {
+  const slot = event.target.closest('[data-drop-slot]');
+  if (!slot || slot.contains(event.relatedTarget)) return;
+  slot.classList.remove('is-drag-over');
+}
+
+function handleDrop(event) {
+  const slot = event.target.closest('[data-drop-slot]');
+  if (!slot) return;
+  event.preventDefault();
+  const playerId = draggedPlayerId || event.dataTransfer.getData('text/plain');
+  const slotId = slot.dataset.dropSlot;
+  clearDragState();
+  if (playerId && slotId) applyAction('replace-starter', { slotId, playerId });
 }
 
 function handleClick(event) {
@@ -192,11 +367,13 @@ function handleClick(event) {
 
   const command = event.target.closest('[data-command]')?.dataset.command;
   if (command === 'play-week') return playWeek();
+  if (command === 'toggle-auto-advance') return toggleAutoAdvance();
   if (command === 'start-next-season') return applyAction('start-next-season');
   if (command === 'export-save') return exportSave();
   if (command === 'import-save') return elements().importInput.click();
   if (command === 'reset-game') {
     if (window.confirm('現在のキャリアを削除して最初から始めますか？')) {
+      cancelAutoAdvance();
       closeMatch();
       localStorage.removeItem(STORAGE_KEY);
       state = null;
@@ -260,6 +437,10 @@ function handleChange(event) {
     filterMarket();
     return;
   }
+  if (event.target.matches('[data-squad-sort], [data-squad-order], [data-squad-role-filter], [data-squad-position-filter]')) {
+    applySquadFilters(true);
+    return;
+  }
   if (event.target.matches('input[name="clubId"]')) {
     const template = event.target.closest('.club-option')?.querySelector('.club-option__name')?.textContent;
     const clubName = document.querySelector('input[name="clubName"]');
@@ -276,6 +457,7 @@ function handleSubmit(event) {
   event.preventDefault();
   const data = new FormData(event.target);
   try {
+    cancelAutoAdvance();
     state = createNewGame({
       managerName: data.get('managerName'),
       clubName: data.get('clubName'),
@@ -298,6 +480,11 @@ function bindEvents() {
   app.addEventListener('change', handleChange);
   app.addEventListener('input', handleInput);
   app.addEventListener('submit', handleSubmit);
+  app.addEventListener('dragstart', handleDragStart);
+  app.addEventListener('dragover', handleDragOver);
+  app.addEventListener('dragleave', handleDragLeave);
+  app.addEventListener('drop', handleDrop);
+  app.addEventListener('dragend', clearDragState);
   importInput.addEventListener('change', () => {
     const [file] = importInput.files;
     if (file) importSave(file);

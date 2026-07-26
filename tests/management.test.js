@@ -150,3 +150,20 @@ test('releasing a player pays compensation and removes him from the squad', asyn
   assert.equal(result.state.clubs.find((item) => item.id === state.userClubId).cash, beforeCash - expectedCompensation);
   assert.equal(result.state.finances.ledger[0].amount, -expectedCompensation);
 });
+
+test('weekly event generation can produce a deterministic quiet week', () => {
+  const state = makeState();
+  const generated = generateWeeklyEvent(state, createRng('director-2026:event:1:1'));
+  assert.equal(generated.inbox.length, 0);
+});
+
+test('an unresolved decision blocks additional weekly events', () => {
+  const state = makeState();
+  state.inbox.unshift({
+    id: 'pending-decision', kind: 'decision', title: 'Pending', body: '', category: '経営', week: 1,
+    resolved: false, choices: [{ id: 'ok', label: 'OK', description: '', effects: {} }]
+  });
+  const generated = generateWeeklyEvent(state, createRng('unresolved-0'));
+  assert.equal(generated.inbox.length, 1);
+  assert.equal(generated.inbox[0].id, 'pending-decision');
+});
