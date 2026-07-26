@@ -1,0 +1,9 @@
+base64_bytes=99240
+decode_status=0
+actual_sha256=ad32bc1749a22bd4ac2ca6a80701a210898bafdfbf85379252a4c20a163a0586
+expected_sha256=c1af393010663b43f138a4ab683ea4c0c819b0dffa58968b92a481f86bb1190c
+Archive:  /tmp/football-director-source.zip
+error [/tmp/football-director-source.zip]:  missing 7500 bytes in zipfile
+  (attempting to process anyway)
+error: invalid zip file with overlapped components (possible zip bomb)
+unzip_status=12
