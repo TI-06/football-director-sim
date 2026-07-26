@@ -1,24 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-part_expected=(
-  2c4392b437a12c4f6f281221c1b62ebd36887769854c0e9620fc2acb4941d670
-  07c7435bf50fd262875989dd0b50a2f31f10bd44605d29d2765b954a8b39f791
-  082e0fb32dc7ce32fdb097c6e28fa37cbba591b14a1df7e62b35b68f3e9db885
+rebuild_chunk() {
+  local chunk="$1"
+  shift
+  local expected=("$@")
+  local dir=".source-v2/${chunk}-parts"
+  for i in $(seq 0 $((${#expected[@]} - 1))); do
+    local part="${dir}/part${i}"
+    local actual
+    actual="$(sha256sum "$part" | cut -d' ' -f1)"
+    if [[ "$actual" != "${expected[$i]}" ]]; then
+      echo "PART_MISMATCH ${chunk}/part${i} expected=${expected[$i]} actual=${actual}"
+      exit 1
+    fi
+  done
+  cat "${dir}"/part{0..3} > ".source-v2/${chunk}"
+  echo "${chunk^^}_REBUILT"
+}
+
+rebuild_chunk chunk03 \
+  2c4392b437a12c4f6f281221c1b62ebd36887769854c0e9620fc2acb4941d670 \
+  07c7435bf50fd262875989dd0b50a2f31f10bd44605d29d2765b954a8b39f791 \
+  082e0fb32dc7ce32fdb097c6e28fa37cbba591b14a1df7e62b35b68f3e9db885 \
   5c6fb593a2118fbd4c56f1bcf559c009ec01de6e9f2edb2603c3c721c6b2e5da
-)
 
-for i in $(seq 0 3); do
-  part=".source-v2/chunk03-parts/part${i}"
-  actual="$(sha256sum "$part" | cut -d' ' -f1)"
-  if [[ "$actual" != "${part_expected[$i]}" ]]; then
-    echo "PART_MISMATCH part${i} expected=${part_expected[$i]} actual=${actual}"
-    exit 1
-  fi
-done
-cat .source-v2/chunk03-parts/part{0..3} > .source-v2/chunk03
-
-echo "CHUNK03_REBUILT"
+rebuild_chunk chunk09 \
+  d5856ce30d21ac210b4d1238f07f8dc21c0094907f4d1161fb78287f19cfecb0 \
+  e7f4d217d6334123ce826df22eff9cfb534adef11fc7a64c2ab91c88fd0b5965 \
+  a72c59fc4eafad5a49c0bb02b839a01f5dae73d3d466e075c18d64623705fe7d \
+  e79beb011a80f0085d9ba48cfc116a422e49bd6905296fcb97404806c612a13d
 
 expected=(
   060c51acb7498ce59d3fecb2c7c21b7fa23449a1ac6955eb567a2b84d1e5a306
