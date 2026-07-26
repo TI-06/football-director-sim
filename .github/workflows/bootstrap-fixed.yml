@@ -1,0 +1,59 @@
+name: Bootstrap source fixed
+
+on:
+  pull_request:
+    types:
+      - opened
+    paths:
+      - .bootstrap-fixed-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  import-source:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Restore and verify project
+        shell: bash
+        run: |
+          cat \
+            .bootstrap/chunk00a \
+            .bootstrap/chunk00b \
+            .bootstrap/chunk01 \
+            .bootstrap/chunk01b \
+            .bootstrap/chunk03 \
+            .bootstrap/chunk04 \
+            .bootstrap/chunk05 \
+            .bootstrap/chunk06 \
+            .bootstrap/chunk07 \
+            .bootstrap/chunk08 \
+            .bootstrap/chunk09a \
+            .bootstrap/chunk09b \
+            .bootstrap/chunk09c \
+            .bootstrap/chunk09d \
+            > /tmp/football-director-source.b64
+          printf '==' >> /tmp/football-director-source.b64
+          base64 --decode /tmp/football-director-source.b64 > /tmp/football-director-source.zip
+          echo "c1af393010663b43f138a4ab683ea4c0c819b0dffa58968b92a481f86bb1190c  /tmp/football-director-source.zip" | sha256sum -c -
+          unzip -o /tmp/football-director-source.zip -d .
+          npm run verify
+          npm run build
+
+      - name: Replace bootstrap files with source
+        shell: bash
+        run: |
+          rm -rf .bootstrap
+          rm -f .bootstrap-trigger .bootstrap-pr-trigger .bootstrap-fixed-trigger bootstrap-diagnostic.txt IMPORT_REQUEST.md
+          rm -f .github/workflows/bootstrap.yml .github/workflows/bootstrap-fixed.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: import football director simulation"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
