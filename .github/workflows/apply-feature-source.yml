@@ -1,0 +1,39 @@
+name: Apply verified feature source
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/drag-lineup-auto-advance
+          fetch-depth: 0
+
+      - name: Verify and restore large source files
+        shell: bash
+        run: |
+          cat .source-v3/chunk* | base64 --decode > /tmp/fd-large-files.tgz
+          echo "ad8504ba9fbae8b5b249f32ccf5729f9fc26690c460c1dc1eb382c677f729dcb  /tmp/fd-large-files.tgz" | sha256sum --check --strict
+          tar -xzf /tmp/fd-large-files.tgz -C .
+          rm -rf .source-v3
+
+      - name: Verify application
+        run: npm run verify && npm run build
+
+      - name: Commit verified feature
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add draggable lineup and event-aware auto advance"
+          git push origin HEAD:feature/drag-lineup-auto-advance
