@@ -29,3 +29,26 @@ test('match modal renders score data and commentary events', () => {
   assert.match(html, /data-match-event/);
   assert.match(html, /マッチスタッツ/);
 });
+
+test('squad view exposes drag targets, role state, and sorting controls', () => {
+  const state = createNewGame({ seed: 'ui-squad-controls', clubId: 'northbridge-fc' });
+  const html = renderApplication(state, 'squad');
+  assert.match(html, /data-drag-player=/);
+  assert.match(html, /data-drop-slot=/);
+  assert.match(html, /data-squad-sort/);
+  assert.match(html, /data-squad-role-filter/);
+  assert.match(html, /aria-pressed="true"/);
+  assert.match(html, /role-badge--captain/);
+  assert.match(html, /role-badge--penalty/);
+});
+
+test('application renders active auto-advance controls and status', () => {
+  const state = createNewGame({ seed: 'ui-auto-advance', clubId: 'northbridge-fc' });
+  const html = renderApplication(state, 'dashboard', {
+    autoAdvanceActive: true,
+    autoAdvanceMessage: 'WEEK 3を自動進行中'
+  });
+  assert.match(html, /data-command="toggle-auto-advance"/);
+  assert.match(html, /自動進行を停止/);
+  assert.match(html, /WEEK 3を自動進行中/);
+});

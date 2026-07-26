@@ -56,7 +56,7 @@ const EVENT_TEMPLATES = [
 export function generateWeeklyEvent(state, rng) {
   const next = deepClone(state);
   const unresolved = next.inbox.some((item) => item.kind === 'decision' && !item.resolved);
-  if (unresolved && !rng.chance(0.35)) return next;
+  if (unresolved || !rng.chance(0.4)) return next;
   const template = rng.pick(EVENT_TEMPLATES);
   const id = `event-${next.season ?? 1}-${next.week}-${template.key}-${next.inbox.length}`;
   next.inbox.unshift({ ...deepClone(template), id, kind: 'decision', week: next.week, resolved: false, selectedChoiceId: null, createdAt: Date.now() });

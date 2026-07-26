@@ -20,6 +20,7 @@ export function icon(name, size = 20) {
     club: '<path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/>',
     inbox: '<path d="M4 4h16v16H4z"/><path d="M4 14h4l2 3h4l2-3h4"/>',
     play: '<path d="m8 5 11 7-11 7V5Z"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>',
     save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
     download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
     upload: '<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/>',
