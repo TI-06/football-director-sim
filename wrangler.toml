@@ -1,0 +1,4 @@
+name = "football-director-sim"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-07-26"
+send_metrics = false
