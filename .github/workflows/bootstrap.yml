@@ -1,11 +1,12 @@
 name: Bootstrap source
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
     paths:
-      - .bootstrap-trigger
+      - .bootstrap-pr-trigger
   workflow_dispatch:
 
 permissions:
@@ -13,10 +14,13 @@ permissions:
 
 jobs:
   import-source:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout source branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Restore and verify project
         shell: bash
@@ -46,10 +50,10 @@ jobs:
         shell: bash
         run: |
           rm -rf .bootstrap
-          rm -f .bootstrap-trigger
+          rm -f .bootstrap-trigger .bootstrap-pr-trigger
           rm -f .github/workflows/bootstrap.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: import football director simulation"
-          git push
+          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
