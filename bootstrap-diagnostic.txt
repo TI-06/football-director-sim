@@ -1,0 +1,13 @@
+base64_bytes=109238
+base64: invalid input
+decode_status=1
+actual_sha256=a23eccd8945090cf89cea2ce10ef54f9dc50761e5ebb07d92c22a08c3a306871
+expected_sha256=c1af393010663b43f138a4ab683ea4c0c819b0dffa58968b92a481f86bb1190c
+Archive:  /tmp/football-director-source.zip
+  End-of-central-directory signature not found.  Either this file is not
+  a zipfile, or it constitutes one disk of a multi-part archive.  In the
+  latter case the central directory and zipfile comment will be found on
+  the last disk(s) of this archive.
+unzip:  cannot find zipfile directory in one of /tmp/football-director-source.zip or
+        /tmp/football-director-source.zip.zip, and cannot find /tmp/football-director-source.zip.ZIP, period.
+unzip_status=9
