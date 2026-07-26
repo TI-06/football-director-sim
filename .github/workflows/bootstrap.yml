@@ -25,10 +25,13 @@ jobs:
       - name: Restore and verify project
         shell: bash
         run: |
+          git fetch origin main --depth=1
+          git show origin/main:.bootstrap/chunk01b > /tmp/chunk01b
           set +e
           cat \
             .bootstrap/chunk00 \
             .bootstrap/chunk01 \
+            /tmp/chunk01b \
             .bootstrap/chunk02 \
             .bootstrap/chunk03 \
             .bootstrap/chunk04 \
@@ -45,6 +48,7 @@ jobs:
             wc -c \
               .bootstrap/chunk00 \
               .bootstrap/chunk01 \
+              /tmp/chunk01b \
               .bootstrap/chunk02 \
               .bootstrap/chunk03 \
               .bootstrap/chunk04 \
