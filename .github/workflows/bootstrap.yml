@@ -32,7 +32,6 @@ jobs:
             .bootstrap/chunk03 \
             .bootstrap/chunk04 \
             .bootstrap/chunk05 \
-            .bootstrap/chunk06 \
             .bootstrap/chunk07 \
             .bootstrap/chunk08 \
             .bootstrap/chunk09a \
