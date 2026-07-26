@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+part_expected=(
+  2c4392b437a12c4f6f281221c1b62ebd36887769854c0e9620fc2acb4941d670
+  07c7435bf50fd262875989dd0b50a2f31f10bd44605d29d2765b954a8b39f791
+  082e0fb32dc7ce32fdb097c6e28fa37cbba591b14a1df7e62b35b68f3e9db885
+  5c6fb593a2118fbd4c56f1bcf559c009ec01de6e9f2edb2603c3c721c6b2e5da
+)
+
+for i in $(seq 0 3); do
+  part=".source-v2/chunk03-parts/part${i}"
+  actual="$(sha256sum "$part" | cut -d' ' -f1)"
+  if [[ "$actual" != "${part_expected[$i]}" ]]; then
+    echo "PART_MISMATCH part${i} expected=${part_expected[$i]} actual=${actual}"
+    exit 1
+  fi
+done
+cat .source-v2/chunk03-parts/part{0..3} > .source-v2/chunk03
+
+echo "CHUNK03_REBUILT"
+
 expected=(
   060c51acb7498ce59d3fecb2c7c21b7fa23449a1ac6955eb567a2b84d1e5a306
   f28448971f299fddec333f47623dfaaf35f828395ffa2d484ef55f5614e7f617
