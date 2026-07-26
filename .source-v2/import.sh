@@ -26,9 +26,9 @@ for i in $(seq -w 0 13); do
     echo "CHUNK_MISMATCH chunk${i} expected=${expected[$index]} actual=${actual}"
     exit 1
   fi
-  echo "CHUNK_OK chunk${i}"
 done
 
+echo "ALL_CHUNKS_OK"
 cat .source-v2/chunk{00..13} > /tmp/football-director-source.b64
 bytes="$(wc -c < /tmp/football-director-source.b64)"
 [[ "$bytes" == "109240" ]] || { echo "BASE64_SIZE_MISMATCH expected=109240 actual=$bytes"; exit 1; }
