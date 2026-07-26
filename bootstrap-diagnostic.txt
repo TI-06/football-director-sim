@@ -1,22 +1,75 @@
-20000 .bootstrap/chunk00
-10000 .bootstrap/chunk01
-10000 .bootstrap/chunk02
-10000 .bootstrap/chunk03
-10000 .bootstrap/chunk04
-10000 .bootstrap/chunk05
-10000 .bootstrap/chunk07
-10000 .bootstrap/chunk08
- 2500 .bootstrap/chunk09a
- 2500 .bootstrap/chunk09b
- 2500 .bootstrap/chunk09c
- 1740 .bootstrap/chunk09d
-99240 total
-base64_bytes=99240
+ 20000 .bootstrap/chunk00
+ 10000 .bootstrap/chunk01
+ 10000 /tmp/chunk01b
+ 10000 .bootstrap/chunk02
+ 10000 .bootstrap/chunk03
+ 10000 .bootstrap/chunk04
+ 10000 .bootstrap/chunk05
+ 10000 .bootstrap/chunk07
+ 10000 .bootstrap/chunk08
+  2500 .bootstrap/chunk09a
+  2500 .bootstrap/chunk09b
+  2500 .bootstrap/chunk09c
+  1740 .bootstrap/chunk09d
+109240 total
+base64_bytes=109240
 decode_status=0
-actual_sha256=ad32bc1749a22bd4ac2ca6a80701a210898bafdfbf85379252a4c20a163a0586
+actual_sha256=3f70d3d0dba314ffa05c81ebf9cabf716a2f383bbea9a60b380dd40d398eb148
 expected_sha256=c1af393010663b43f138a4ab683ea4c0c819b0dffa58968b92a481f86bb1190c
 Archive:  /tmp/football-director-source.zip
-error [/tmp/football-director-source.zip]:  missing 7500 bytes in zipfile
-  (attempting to process anyway)
-error: invalid zip file with overlapped components (possible zip bomb)
-unzip_status=12
+    testing: tests/                   OK
+    testing: tests/management.test.js   OK
+    testing: tests/random.test.js     OK
+    testing: tests/match-engine.test.js   OK
+    testing: tests/build.test.js      OK
+    testing: tests/game-engine.test.js   OK
+    testing: tests/fixtures.test.js   OK
+    testing: tests/squad.test.js      OK
+    testing: tests/ui.test.js         OK
+    testing: assets/                  OK
+    testing: assets/favicon.svg       OK
+    testing: wrangler.toml            OK
+    testing: _headers                 bad CRC 9bb0139d  (should be 01735023)
+    testing: docs/                    OK
+    testing: docs/code-review.md      OK
+    testing: docs/test-report.md      OK
+    testing: docs/superpowers/        OK
+    testing: docs/superpowers/plans/   OK
+    testing: docs/superpowers/plans/2026-07-26-football-director-simulation-plan.md   OK
+    testing: docs/superpowers/specs/   OK
+    testing: docs/superpowers/specs/2026-07-26-football-director-simulation-design.md   OK
+    testing: .gitignore               OK
+    testing: README.md                OK
+    testing: .node-version            OK
+    testing: package.json             OK
+    testing: index.html               OK
+    testing: src/                     OK
+    testing: src/core/                OK
+    testing: src/core/utils.js        OK
+    testing: src/core/random.js       OK
+    testing: src/styles.css          
+  error:  invalid compressed data to inflate
+file #32:  bad zipfile offset (local header sig):  31227
+file #33:  bad zipfile offset (local header sig):  31292
+file #34:  bad zipfile offset (local header sig):  33090
+file #35:  bad zipfile offset (local header sig):  36692
+file #36:  bad zipfile offset (local header sig):  48901
+file #37:  bad zipfile offset (local header sig):  48968
+file #38:  bad zipfile offset (local header sig):  53173
+file #39:  bad zipfile offset (local header sig):  53240
+file #40:  bad zipfile offset (local header sig):  54828
+file #41:  bad zipfile offset (local header sig):  56583
+    testing: src/game/squad.js        OK
+    testing: src/game/fixtures.js     OK
+    testing: src/game/save.js         OK
+    testing: src/game/economy.js      OK
+    testing: src/game/match-engine.js   OK
+    testing: src/game/events.js       OK
+    testing: src/main.js              OK
+    testing: scripts/                 OK
+    testing: scripts/build.mjs        OK
+    testing: scripts/dev-server.mjs   OK
+    testing: scripts/quality.mjs      OK
+    testing: scripts/smoke-server.mjs   OK
+At least one error was detected in /tmp/football-director-source.zip.
+unzip_status=2
