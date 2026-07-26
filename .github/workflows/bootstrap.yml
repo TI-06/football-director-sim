@@ -45,6 +45,20 @@ jobs:
             > /tmp/football-director-source.b64
 
           {
+            sha256sum \
+              .bootstrap/chunk00 \
+              .bootstrap/chunk01 \
+              /tmp/chunk01b \
+              .bootstrap/chunk02 \
+              .bootstrap/chunk03 \
+              .bootstrap/chunk04 \
+              .bootstrap/chunk05 \
+              .bootstrap/chunk07 \
+              .bootstrap/chunk08 \
+              .bootstrap/chunk09a \
+              .bootstrap/chunk09b \
+              .bootstrap/chunk09c \
+              .bootstrap/chunk09d
             wc -c \
               .bootstrap/chunk00 \
               .bootstrap/chunk01 \
