@@ -4,41 +4,35 @@ on:
   pull_request:
     types:
       - opened
-      - synchronize
     paths:
       - .bootstrap-pr-trigger
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   import-source:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Restore and verify project
         shell: bash
         run: |
-          git fetch origin main --depth=1
-          git show origin/main:.bootstrap/chunk01b > /tmp/chunk01b
-          head -c 10000 .bootstrap/chunk00 > /tmp/chunk00a
-          tail -c 10000 .bootstrap/chunk00 > /tmp/chunk00b
-          head -c 10000 .bootstrap/chunk06 > /tmp/chunk06a
           set +e
           cat \
-            .bootstrap/chunk00 \
+            .bootstrap/chunk00a \
+            .bootstrap/chunk00b \
             .bootstrap/chunk01 \
-            /tmp/chunk01b \
+            .bootstrap/chunk01b \
             .bootstrap/chunk03 \
             .bootstrap/chunk04 \
             .bootstrap/chunk05 \
-            /tmp/chunk06a \
+            .bootstrap/chunk06 \
             .bootstrap/chunk07 \
             .bootstrap/chunk08 \
             .bootstrap/chunk09a \
@@ -48,10 +42,6 @@ jobs:
             > /tmp/football-director-source.b64
 
           {
-            echo "expected_chunk00a=8d2edfec7e96d428d112f788f2b95f5d5e0931852f5162be36501ed8c592c0b6"
-            echo "expected_chunk00b=a99f45f9bc5508e1f91adafded0733ac9c99d9ae10f5feaec5b17ed1ee996f68"
-            echo "expected_chunk06a=8e6603c2757916a7d1b07cf1da5ea70a706247413d2ce33fd4c9742748096069"
-            sha256sum /tmp/chunk00a /tmp/chunk00b /tmp/chunk06a
             echo "base64_bytes=$(wc -c < /tmp/football-director-source.b64)"
             base64 --decode /tmp/football-director-source.b64 > /tmp/football-director-source.zip
             decode_status=$?
@@ -87,7 +77,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add bootstrap-diagnostic.txt
           git commit -m "chore: record bootstrap diagnostic" || true
-          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Replace bootstrap files with source
         if: success()
@@ -100,4 +90,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: import football director simulation"
-          git push origin HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
