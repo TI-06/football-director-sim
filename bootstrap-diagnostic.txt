@@ -1,3 +1,16 @@
+20000 .bootstrap/chunk00
+10000 .bootstrap/chunk01
+10000 .bootstrap/chunk02
+10000 .bootstrap/chunk03
+10000 .bootstrap/chunk04
+10000 .bootstrap/chunk05
+10000 .bootstrap/chunk07
+10000 .bootstrap/chunk08
+ 2500 .bootstrap/chunk09a
+ 2500 .bootstrap/chunk09b
+ 2500 .bootstrap/chunk09c
+ 1740 .bootstrap/chunk09d
+99240 total
 base64_bytes=99240
 decode_status=0
 actual_sha256=ad32bc1749a22bd4ac2ca6a80701a210898bafdfbf85379252a4c20a163a0586
