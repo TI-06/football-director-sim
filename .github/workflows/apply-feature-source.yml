@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/drag-lineup-auto-advance
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -12,9 +15,10 @@ jobs:
   apply-source:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch
+      - name: Check out feature branch
         uses: actions/checkout@v4
         with:
+          ref: feature/drag-lineup-auto-advance
           fetch-depth: 0
 
       - name: Verify and restore large source files
