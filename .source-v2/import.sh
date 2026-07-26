@@ -1,6 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+verify_and_join() {
+  local output="$1"
+  local dir="$2"
+  shift 2
+  local expected=("$@")
+  for i in $(seq 0 $((${#expected[@]} - 1))); do
+    local part="${dir}/$(printf '%s' "${3:-part}")${i}"
+    local actual
+    actual="$(sha256sum "$part" | cut -d' ' -f1)"
+    if [[ "$actual" != "${expected[$i]}" ]]; then
+      echo "PART_MISMATCH ${part} expected=${expected[$i]} actual=${actual}"
+      exit 1
+    fi
+  done
+}
+
+sub_expected=(
+  60afe3d7e2488a808a2ee4624ede55c6102d13a53008305be06775226c44bcf8
+  149b78423fbea463da687bb2119fbc6d8874a97ca3598066238b04a115c18341
+  807451fddb9576cb2b6d017f80b42dbcfedc8e4d96397829e5e0ed154597c5d7
+  d051be0cfb0200ad43870ff91e9313621eee686917b8ddd21f469d0741ffd201
+)
+for i in $(seq 0 3); do
+  part=".source-v2/chunk09-parts/part3-subs/sub${i}"
+  actual="$(sha256sum "$part" | cut -d' ' -f1)"
+  if [[ "$actual" != "${sub_expected[$i]}" ]]; then
+    echo "SUBPART_MISMATCH sub${i} expected=${sub_expected[$i]} actual=${actual}"
+    exit 1
+  fi
+done
+cat .source-v2/chunk09-parts/part3-subs/sub{0..3} > .source-v2/chunk09-parts/part3
+
+echo "CHUNK09_PART3_REBUILT"
+
 rebuild_chunk() {
   local chunk="$1"
   shift
