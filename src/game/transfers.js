@@ -1,6 +1,20 @@
 import { deepClone, clamp } from '../core/utils.js';
 import { clubWeeklyWages } from './economy.js';
 
+function archiveDepartedPlayer(state, player, departureType, fee = 0) {
+  state.history ??= {};
+  state.history.departedPlayers ??= [];
+  state.history.departedPlayers.unshift({
+    ...structuredClone(player),
+    departureType,
+    departureSeason: state.season ?? 1,
+    departureWeek: state.week ?? 1,
+    departureFee: fee
+  });
+  state.history.departedPlayers = state.history.departedPlayers.slice(0, 250);
+}
+
+
 export function buyPlayer(state, playerId) {
   const next = deepClone(state);
   const marketIndex = next.transferMarket.findIndex((player) => player.id === playerId);
@@ -46,7 +60,8 @@ export function sellPlayer(state, playerId, rng) {
   const fee = Math.round(player.value * rng.float(0.72, 1.08));
   const club = next.clubs.find((item) => item.id === next.userClubId);
   club.cash += fee;
-  club.transferBudget += Math.round(fee * 0.85);
+  club.transferBudget += Math.round(fee * (club.saleRetention ?? 0.85));
+  archiveDepartedPlayer(next, player, 'transfer', fee);
   next.players.splice(index, 1);
   next.finances.ledger.unshift({ id: `transfer-sale-${state.week}-${player.id}`, week: state.week, clubId: club.id, type: 'income', label: `売却: ${player.name}`, amount: fee, timestamp: Date.now() });
   return { ok: true, state: next, message: `${player.name}を売却しました。` };
@@ -63,6 +78,7 @@ export function releasePlayer(state, playerId) {
   const compensation = player.wage * 12;
   if (club.cash < compensation) return { ok: false, state, message: '契約解除の補償金が不足しています。' };
   club.cash -= compensation;
+  archiveDepartedPlayer(next, player, 'release', 0);
   next.players.splice(index, 1);
   next.finances.ledger.unshift({ id: `release-${state.week}-${player.id}`, week: state.week, clubId: club.id, type: 'expense', label: `契約解除: ${player.name}`, amount: -compensation, timestamp: Date.now() });
   return { ok: true, state: next, message: `${player.name}との契約を解除しました。補償金は12週分の給与です。` };
@@ -87,4 +103,26 @@ export function marketEstimate(player, field) {
   if (player.scouting >= 100) return player[field];
   const uncertainty = clamp(Math.round((100 - player.scouting) / 8), 2, 9);
   return `${Math.max(1, player[field] - uncertainty)}–${Math.min(99, player[field] + uncertainty)}`;
+}
+
+
+export function renewPlayerContract(state, playerId, years = 3) {
+  const next = deepClone(state);
+  const player = next.players.find((item) => item.id === playerId && item.clubId === next.userClubId);
+  const club = next.clubs.find((item) => item.id === next.userClubId);
+  const duration = clamp(Math.round(Number(years) || 3), 1, 5);
+  if (!player || !club) return { ok: false, state, message: '選手が見つかりません。' };
+  const signingBonus = Math.round(player.wage * (8 + duration * 2));
+  const newWage = Math.round(player.wage * (1.04 + duration * 0.025));
+  const currentWages = clubWeeklyWages(next, club.id) - player.wage;
+  if (club.cash - signingBonus < (club.reserveCash ?? 0)) return { ok: false, state, message: '契約金を支払うと理事会予備資金を下回ります。' };
+  if (currentWages + newWage > club.wageBudget) return { ok: false, state, message: '更新後の給与が給与予算を超えます。' };
+  club.cash -= signingBonus;
+  player.wage = newWage;
+  player.contractYears = duration;
+  player.happiness = clamp((player.happiness ?? 60) + 18, 5, 100);
+  player.concerns = (player.concerns ?? []).filter((concern) => !/契約/.test(concern));
+  player.transferRequest = player.happiness < 35 && player.transferRequest;
+  next.finances.ledger.unshift({ id: `renew-${state.week}-${player.id}`, week: state.week, clubId: club.id, type: 'expense', label: `契約更新: ${player.name}`, amount: -signingBonus, timestamp: Date.now() });
+  return { ok: true, state: next, message: `${player.name}と${duration}年契約を結びました。` };
 }

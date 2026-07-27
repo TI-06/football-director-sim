@@ -4,7 +4,7 @@ import { createRng } from '../src/core/random.js';
 import { generateLeague, generateTransferMarket } from '../src/data/catalog.js';
 import { settleWeeklyFinances, upgradeFacility } from '../src/game/economy.js';
 import { applyWeeklyTraining, recoverPlayers, promoteProspect } from '../src/game/development.js';
-import { buyPlayer, listPlayerForSale } from '../src/game/transfers.js';
+import { buyPlayer, listPlayerForSale, sellPlayer } from '../src/game/transfers.js';
 import { generateWeeklyEvent, resolveEvent } from '../src/game/events.js';
 
 function makeState() {
@@ -106,14 +106,14 @@ test('weekly event can be resolved and applies choice effects once', () => {
 
 test('selected club does not receive opponent difficulty boost', async () => {
   const { generateLeague } = await import('../src/data/catalog.js');
-  const normal = generateLeague(createRng('difficulty-selected'), 'normal', 'azure-city');
-  const hard = generateLeague(createRng('difficulty-selected'), 'hard', 'azure-city');
+  const normal = generateLeague(createRng('difficulty-selected'), 'normal', 'jp1-01');
+  const hard = generateLeague(createRng('difficulty-selected'), 'hard', 'jp1-01');
   const averageOverall = (league, clubId) => {
     const players = league.players.filter((player) => player.clubId === clubId);
     return players.reduce((sum, player) => sum + player.overall, 0) / players.length;
   };
-  assert.equal(averageOverall(normal, 'azure-city'), averageOverall(hard, 'azure-city'));
-  assert.ok(averageOverall(hard, 'redhaven-athletic') > averageOverall(normal, 'redhaven-athletic'));
+  assert.equal(averageOverall(normal, 'jp1-01'), averageOverall(hard, 'jp1-01'));
+  assert.ok(averageOverall(hard, 'jp1-02') > averageOverall(normal, 'jp1-02'));
 });
 
 test('transfer ledger records the actual agreed fee', () => {
@@ -166,4 +166,48 @@ test('an unresolved decision blocks additional weekly events', () => {
   const generated = generateWeeklyEvent(state, createRng('unresolved-0'));
   assert.equal(generated.inbox.length, 1);
   assert.equal(generated.inbox[0].id, 'pending-decision');
+});
+
+test('cash can be allocated to transfer budget while preserving board reserve', async () => {
+  const { allocateTransferBudget } = await import('../src/game/economy.js');
+  const state = makeState();
+  const club = state.clubs.find((item) => item.id === state.userClubId);
+  club.cash = 1_000_000_000;
+  club.transferBudget = 100_000_000;
+  club.reserveCash = 300_000_000;
+  const result = allocateTransferBudget(state, 200_000_000);
+  assert.equal(result.ok, true);
+  const updated = result.state.clubs.find((item) => item.id === state.userClubId);
+  assert.equal(updated.transferBudget, 300_000_000);
+  assert.equal(updated.cash, 800_000_000);
+  const blocked = allocateTransferBudget(result.state, 600_000_000);
+  assert.equal(blocked.ok, false);
+});
+
+test('long term club investment remains available after facilities reach level five', async () => {
+  const { investClubProject, clubProjectCost } = await import('../src/game/economy.js');
+  const state = makeState();
+  const club = state.clubs.find((item) => item.id === state.userClubId);
+  club.cash = 5_000_000_000;
+  club.facilities = { training: 5, academy: 5, scouting: 5, stadium: 5 };
+  const cost = clubProjectCost(club, 'analytics');
+  assert.ok(cost > 0);
+  const result = investClubProject(state, 'analytics');
+  assert.equal(result.ok, true);
+  assert.equal(result.state.clubs.find((item) => item.id === state.userClubId).projects.analytics, 1);
+});
+
+
+test('sold players remain in club history with their career records', () => {
+  const state = makeState();
+  state.season = 3;
+  const player = state.players.find((item) => item.clubId === state.userClubId && item.position !== 'GK');
+  player.listed = true;
+  player.careerStats.goals = 42;
+  const result = sellPlayer(state, player.id, createRng('archive-sale'));
+  assert.equal(result.ok, true);
+  const archived = result.state.history.departedPlayers.find((item) => item.id === player.id);
+  assert.ok(archived);
+  assert.equal(archived.careerStats.goals, 42);
+  assert.equal(archived.departureType, 'transfer');
 });

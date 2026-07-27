@@ -4,7 +4,7 @@ import { autoAdvanceStopReason, unresolvedDecisionIds } from './auto-advance.js'
 import { renderApplication, renderMatchModal, renderNewGame } from './render.js';
 import { compareSquadRows, matchesSquadFilters } from './squad-controls.js';
 
-const STORAGE_KEY = 'football-director-save-v1';
+const STORAGE_KEY = 'football-director-save-v2';
 const AUTO_ADVANCE_DELAY = 650;
 
 let state = null;
@@ -406,6 +406,19 @@ function handleClick(event) {
       return;
     }
     if (action === 'promote-prospect') return applyAction('promote-prospect', { playerId });
+    if (action === 'renew-contract') {
+      if (window.confirm('3年契約で更新しますか？更新時に契約金が発生します。')) applyAction('renew-contract', { playerId, years: 3 });
+      return;
+    }
+    if (action === 'allocate-transfer-budget') {
+      const amount = Number(actionElement.dataset.amount);
+      if (window.confirm(`${Math.round(amount / 100_000_000)}億円を移籍予算へ配分しますか？`)) applyAction('allocate-transfer-budget', { amount });
+      return;
+    }
+    if (action === 'invest-project') {
+      if (window.confirm('継続投資を実行しますか？毎週の維持費も増加します。')) applyAction('invest-project', { projectId: actionElement.dataset.projectId });
+      return;
+    }
     if (action === 'upgrade-facility') {
       if (window.confirm('クラブ資金を使って施設を強化しますか？')) applyAction('upgrade-facility', { facility: actionElement.dataset.facility });
       return;
@@ -429,6 +442,10 @@ function handleChange(event) {
     applyAction('update-tactics', { [event.target.dataset.tacticKey]: event.target.value });
     return;
   }
+  if (event.target.matches('[data-formation-quick]')) {
+    applyAction('update-tactics', { formation: event.target.value });
+    return;
+  }
   if (event.target.matches('[data-training-focus]')) {
     applyAction('update-training', { focus: event.target.value });
     return;
@@ -441,10 +458,17 @@ function handleChange(event) {
     applySquadFilters(true);
     return;
   }
-  if (event.target.matches('input[name="clubId"]')) {
-    const template = event.target.closest('.club-option')?.querySelector('.club-option__name')?.textContent;
-    const clubName = document.querySelector('input[name="clubName"]');
-    if (template && clubName) clubName.value = template;
+  if (event.target.matches('input[name="clubMode"]')) {
+    const mode = event.target.value;
+    document.querySelectorAll('[data-club-mode-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.clubModePanel !== mode;
+    });
+    const created = mode === 'created';
+    for (const name of ['clubName', 'homeCity']) {
+      const input = document.querySelector(`[name="${name}"]`);
+      if (input) input.required = created;
+    }
+    return;
   }
 }
 
@@ -460,7 +484,11 @@ function handleSubmit(event) {
     cancelAutoAdvance();
     state = createNewGame({
       managerName: data.get('managerName'),
+      clubMode: data.get('clubMode'),
       clubName: data.get('clubName'),
+      homeCity: data.get('homeCity'),
+      primaryColor: data.get('primaryColor'),
+      clubPhilosophy: data.get('clubPhilosophy'),
       clubId: data.get('clubId'),
       difficulty: data.get('difficulty'),
       seed: data.get('seed')

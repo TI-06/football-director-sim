@@ -445,3 +445,47 @@ tr.is-unavailable { opacity: .66; }
   .club-badge--lg { width: 48px; height: 54px; font-size: 11px; }
   .match-actions { position: sticky; bottom: 0; background: #07110d; }
 }
+
+/* Japan pyramid career expansion */
+.career-mode-picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.existing-club-panel { display: grid; gap: 16px; max-height: 720px; overflow: auto; padding-right: 5px; }
+.club-division-group { display: grid; gap: 9px; }
+.club-division-group > header { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; }
+.club-division-group > header strong { color: var(--text); font-size: 13px; }
+.created-club-panel { padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.018); }
+.form-help { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.squad-formation-sticky { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 112px); overflow: auto; }
+.formation-quick-actions { display: flex; align-items: end; gap: 8px; }
+.formation-quick-actions label { display: grid; gap: 4px; color: var(--muted); font-size: 9px; }
+.formation-quick-actions .control-select { min-height: 34px; padding: 6px 9px; font-size: 10px; }
+.player-concern { display: block; max-width: 120px; margin-top: 4px; color: var(--warning); font-size: 8px; line-height: 1.4; }
+.division-standings-grid { display: grid; gap: 14px; }
+.position-number--danger { color: #fda4af; background: rgba(251,113,133,.1); }
+.fixture-scroll { max-height: 760px; overflow: auto; }
+.fixture-competition { display: grid; color: var(--text); font-size: 10px; font-weight: 900; }
+.fixture-competition small { color: var(--muted); font-size: 8px; font-weight: 600; white-space: nowrap; }
+.cup-round-list { display: grid; gap: 8px; margin-top: 18px; }
+.cup-round-list > div { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.project-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.budget-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.award-season + .award-season { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.award-season h4 { margin: 0 0 12px; }
+.award-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.award-grid > div { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.018); }
+.award-grid span, .award-grid strong, .award-grid small { display: block; }
+.award-grid span, .award-grid small { color: var(--muted); font-size: 9px; }
+.award-grid strong { margin: 5px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+
+@media (max-width: 1180px) {
+  .project-grid { grid-template-columns: repeat(3, 1fr); }
+  .award-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .squad-formation-sticky { position: static; max-height: none; overflow: visible; }
+  .project-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .career-mode-picker, .project-grid, .award-grid { grid-template-columns: 1fr; }
+  .formation-quick-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .formation-quick-actions .btn { width: 100%; }
+}

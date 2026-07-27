@@ -1,7 +1,7 @@
 import { CLUB_TEMPLATES, DIFFICULTIES, FORMATIONS, TRAINING_FOCUSES } from '../data/catalog.js';
 import { getWeekFixtures } from '../game/fixtures.js';
+import { PROJECTS, clubProjectCost, clubWeeklyWages, facilityUpgradeCost } from '../game/economy.js';
 import { playerSlotScore } from '../game/squad.js';
-import { clubWeeklyWages, facilityUpgradeCost } from '../game/economy.js';
 import { marketEstimate } from '../game/transfers.js';
 import { average, formatMoney } from '../core/utils.js';
 import { clubBadge, emptyState, escapeHtml, formDots, icon, metricCard, money, progressBar } from './templates.js';
@@ -13,6 +13,8 @@ export const NAV_ITEMS = [
   ['schedule', '日程・順位表', 'calendar'],
   ['transfers', '移籍市場', 'transfer'],
   ['academy', 'アカデミー', 'academy'],
+  ['records', '記録・タイトル', 'trophy'],
+  ['secretary', '秘書レポート', 'star'],
   ['club', 'クラブ経営', 'club'],
   ['inbox', '受信トレイ', 'inbox']
 ];
@@ -24,6 +26,8 @@ const PAGE_META = {
   schedule: ['日程・順位表', 'リーグ全体の結果と今後の対戦を確認します。'],
   transfers: ['移籍市場', 'スカウト情報、移籍金、給与予算を見ながら補強します。'],
   academy: ['ユースアカデミー', '将来の主力候補を育成し、トップチームへ昇格させます。'],
+  records: ['記録・タイトル', 'シーズン成績、通算成績、個人タイトルを確認します。'],
+  secretary: ['秘書レポート', '次戦、選手状態、契約、予算の重要事項を整理します。'],
   club: ['クラブ経営', '財務、施設、取締役会、サポーター状況を管理します。'],
   inbox: ['受信トレイ', '選手、スタッフ、取締役会から届いた判断事項を処理します。']
 };
@@ -53,7 +57,11 @@ function resultForReport(report, clubId) {
 
 function nextFixture(state) {
   if (state.seasonStatus !== 'active') return null;
-  return getWeekFixtures(state.fixtures, state.week).find((fixture) => [fixture.homeId, fixture.awayId].includes(state.userClubId)) ?? null;
+  const candidates = [
+    ...(state.fixtures ?? []),
+    ...(state.cup?.fixtures ?? [])
+  ].filter((fixture) => !fixture.played && fixture.week >= state.week && [fixture.homeId, fixture.awayId].includes(state.userClubId));
+  return candidates.sort((a, b) => a.week - b.week)[0] ?? null;
 }
 
 function overallSquadMetrics(state) {
@@ -76,43 +84,53 @@ function navHtml(state, currentView, mobile = false) {
 }
 
 export function renderNewGame() {
+  const divisionGroups = [1, 2, 3].map((division) => {
+    const clubs = CLUB_TEMPLATES.filter((club) => club.division === division);
+    return `<section class="club-division-group"><header><strong>日本${division}部</strong><span>${clubs.length}クラブ</span></header><div class="club-picker">${clubs.map((club, index) => `<label class="club-option">
+      <input type="radio" name="clubId" value="${club.id}" ${division === 1 && index === 0 ? 'checked' : ''}>
+      <span class="club-option__body">${clubBadge(club, 'md')}<span><span class="club-option__name">${escapeHtml(club.name)}</span><span class="club-option__meta">日本${division}部 · 評判 ${club.reputation}<br>${escapeHtml(club.city)} · ${escapeHtml(club.stadium)}</span></span></span>
+    </label>`).join('')}</div></section>`;
+  }).join('');
   return `<main class="new-game">
     <div class="new-game__shell">
       <section class="new-game__intro">
-        <span class="eyebrow">${icon('trophy', 17)} Football management simulation</span>
+        <span class="eyebrow">${icon('trophy', 17)} 日本クラブ経営シミュレーション</span>
         <h1>FOOTBALL <span>DIRECTOR</span></h1>
-        <p class="new-game__lead">戦術だけでは勝てない。選手の疲労、移籍予算、若手の成長、取締役会の期待まで判断し、14試合のシーズンを戦い抜くクラブ経営シミュレーションです。</p>
+        <p class="new-game__lead">日本1部・2部・3部の60クラブ、昇格と降格、全国王者杯、選手の成長・不満・引退までを管理する長期キャリアです。</p>
         <ul class="feature-list">
-          <li>${icon('tactics')} 5つのフォーメーションと戦術相性</li>
-          <li>${icon('transfer')} スカウト精度つき移籍市場</li>
-          <li>${icon('academy')} ユース育成と施設投資</li>
-          <li>${icon('pulse')} xG・実況・負傷を含む試合エンジン</li>
+          <li>${icon('calendar')} 3部制・各20クラブ・リーグ38節</li>
+          <li>${icon('trophy')} 全60クラブ参加の全国王者杯</li>
+          <li>${icon('squad')} 日本語の架空クラブと架空選手</li>
+          <li>${icon('star')} 個人成績・タイトル・秘書レポート</li>
         </ul>
-        <p class="research-note">実在クラブ・選手・画像は使用していません。ゲームデータはすべてシードから生成され、ブラウザ内に保存されます。</p>
+        <p class="research-note">実在クラブ・選手・大会名は使用していません。新設クラブでは日本3部から頂点を目指します。</p>
       </section>
       <form id="new-game-form" class="new-game__form">
         <section class="form-section">
           <div class="form-section__title"><h2>監督プロフィール</h2><span>STEP 01</span></div>
-          <div class="field-grid">
-            <label class="field"><span>監督名</span><input name="managerName" value="Tak Manager" maxlength="32" required autocomplete="off"></label>
-            <label class="field"><span>クラブ表示名</span><input name="clubName" value="Northbridge FC" maxlength="32" required autocomplete="off"></label>
-          </div>
+          <label class="field"><span>監督名</span><input name="managerName" value="山田 太郎" maxlength="32" required autocomplete="off"></label>
         </section>
         <section class="form-section">
-          <div class="form-section__title"><h2>クラブを選択</h2><span>STEP 02</span></div>
-          <div class="club-picker">
-            ${CLUB_TEMPLATES.map((club, index) => `<label class="club-option">
-              <input type="radio" name="clubId" value="${club.id}" ${index === 0 ? 'checked' : ''}>
-              <span class="club-option__body">${clubBadge(club, 'md')}<span><span class="club-option__name">${escapeHtml(club.name)}</span><span class="club-option__meta">評判 ${club.reputation} / ${escapeHtml(club.style)}<br>${escapeHtml(club.stadium)} · ${club.capacity.toLocaleString('ja-JP')}席</span></span></span>
-            </label>`).join('')}
+          <div class="form-section__title"><h2>キャリア開始方法</h2><span>STEP 02</span></div>
+          <div class="career-mode-picker">
+            <label class="difficulty-option"><input type="radio" name="clubMode" value="existing" checked><span><strong>既存クラブを率いる</strong><small>日本1部・2部・3部の60クラブから選択</small></span></label>
+            <label class="difficulty-option"><input type="radio" name="clubMode" value="created"><span><strong>新規クラブを設立</strong><small>日本3部から昇格を目指す</small></span></label>
+          </div>
+          <div data-club-mode-panel="existing" class="existing-club-panel">${divisionGroups}</div>
+          <div data-club-mode-panel="created" class="created-club-panel" hidden>
+            <div class="field-grid">
+              <label class="field"><span>クラブ名</span><input name="clubName" value="横浜みなとSC" maxlength="32" autocomplete="off"></label>
+              <label class="field"><span>本拠地</span><input name="homeCity" value="神奈川県" maxlength="24" autocomplete="off"></label>
+              <label class="field"><span>クラブカラー</span><input name="primaryColor" type="color" value="#16a34a"></label>
+              <label class="field"><span>クラブ方針</span><select name="clubPhilosophy"><option value="balanced">総合型</option><option value="youth">育成重視</option><option value="pressing">前線プレス</option><option value="possession">保持重視</option></select></label>
+            </div>
+            <p class="form-help">新設クラブは日本3部の1枠と入れ替わり、初期戦力と資金は3部水準になります。</p>
           </div>
         </section>
         <section class="form-section">
           <div class="form-section__title"><h2>ゲーム設定</h2><span>STEP 03</span></div>
-          <div class="difficulty-picker">
-            ${Object.values(DIFFICULTIES).map((difficulty) => `<label class="difficulty-option"><input type="radio" name="difficulty" value="${difficulty.id}" ${difficulty.id === 'normal' ? 'checked' : ''}><span><strong>${escapeHtml(difficulty.label)}</strong><small>${difficulty.id === 'casual' ? '資金に余裕。取締役会も寛容。' : difficulty.id === 'hard' ? '少ない予算と強い対戦相手。' : '標準的な経営バランス。'}</small></span></label>`).join('')}
-          </div>
-          <label class="field" style="margin-top:14px"><span>ワールドシード</span><input name="seed" value="director-2026" maxlength="48" required><small>同じシードなら同じ初期選手・日程になります。</small></label>
+          <div class="difficulty-picker">${Object.values(DIFFICULTIES).map((difficulty) => `<label class="difficulty-option"><input type="radio" name="difficulty" value="${difficulty.id}" ${difficulty.id === 'normal' ? 'checked' : ''}><span><strong>${escapeHtml(difficulty.label)}</strong><small>${difficulty.id === 'casual' ? '経営に余裕があり、AI補強も穏やか。' : difficulty.id === 'hard' ? '厳しい予算と高精度のAI補強。' : '標準的な経営バランス。'}</small></span></label>`).join('')}</div>
+          <label class="field" style="margin-top:14px"><span>ワールドシード</span><input name="seed" value="日本リーグ2026" maxlength="48" required><small>同じシードなら初期選手と日程が再現されます。</small></label>
         </section>
         <button class="btn btn--primary btn--wide" type="submit">${icon('play')} キャリアを開始</button>
       </form>
@@ -135,7 +153,7 @@ function appShell(state, currentView, content, uiState = {}) {
   return `<div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar__brand"><span class="sidebar__brand-mark">FD</span><div><strong>Football Director</strong><small>CAREER MODE</small></div></div>
-      <div class="sidebar__club">${clubBadge(club, 'sm')}<div><strong>${escapeHtml(club.name)}</strong><span>${escapeHtml(state.managerName)}監督</span></div></div>
+      <div class="sidebar__club">${clubBadge(club, 'sm')}<div><strong>${escapeHtml(club.name)}</strong><span>${escapeHtml(club.divisionName)} · ${escapeHtml(state.managerName)}監督</span></div></div>
       ${navHtml(state, currentView)}
       <div class="sidebar__footer">
         <button class="sidebar__utility" type="button" data-command="export-save">${icon('download', 17)}<span>セーブを書き出す</span></button>
@@ -145,7 +163,7 @@ function appShell(state, currentView, content, uiState = {}) {
     </aside>
     <div class="main-shell">
       <header class="topbar">
-        <div class="topbar__context"><small>SEASON ${state.season} · WEEK ${Math.min(state.week, 14)}</small><h1>${escapeHtml(title)}</h1>${autoMessage}</div>
+        <div class="topbar__context"><small>SEASON ${state.season} · WEEK ${Math.min(state.week, state.seasonWeeks ?? 44)} / ${state.seasonWeeks ?? 44}</small><h1>${escapeHtml(title)}</h1>${autoMessage}</div>
         <div class="topbar__actions">
           <div class="date-chip">${icon('calendar', 16)} ${escapeHtml(state.currentDate)}</div>
           ${autoAdvanceControl(state, uiState)}
@@ -185,7 +203,7 @@ function renderDashboard(state, uiState = {}) {
     const opponentPlayers = state.players.filter((player) => player.clubId === opponent.id);
     const opponentOverall = Math.round(average(opponentPlayers.map((player) => player.overall)));
     matchCard = `<article class="card next-match">
-      <div class="next-match__top"><span>LEAGUE · MATCHWEEK ${fixture.week}</span><span>${home.id === state.userClubId ? 'HOME' : 'AWAY'} · ${escapeHtml(home.id === state.userClubId ? club.stadium : opponent.stadium)}</span></div>
+      <div class="next-match__top"><span>${escapeHtml(fixture.competitionName ?? (fixture.competition === 'cup' ? '全国王者杯' : club.divisionName))} · WEEK ${fixture.week}</span><span>${home.id === state.userClubId ? 'HOME' : 'AWAY'} · ${escapeHtml(home.id === state.userClubId ? club.stadium : opponent.stadium)}</span></div>
       <div class="next-match__teams">
         <div class="next-team">${clubBadge(home, 'lg')}<strong>${escapeHtml(home.name)}</strong></div>
         <span class="versus">VS</span>
@@ -231,7 +249,7 @@ function lineupPitch(state) {
   const players = userPlayers(state);
   const captain = players.find((player) => player.id === state.lineup.captainId);
   const penaltyTaker = players.find((player) => player.id === state.lineup.penaltyTakerId);
-  return `<div class="card"><div class="card__header"><div><h3>先発フォーメーション</h3><p>${escapeHtml(state.tactics.formation)} · 選手カードをドラッグして配置変更</p></div><button class="btn btn--secondary btn--sm" type="button" data-action="auto-lineup">自動編成</button></div>
+  return `<div class="card squad-formation-sticky"><div class="card__header"><div><h3>先発フォーメーション</h3><p>${escapeHtml(state.tactics.formation)} · 選手カードをドラッグして配置変更</p></div><div class="formation-quick-actions"><label><span>フォーメーション</span><select class="control-select" data-formation-quick>${Object.keys(FORMATIONS).map((value) => `<option value="${value}" ${state.tactics.formation === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label><button class="btn btn--secondary btn--sm" type="button" data-action="auto-lineup">自動編成</button></div></div>
     <div class="card__body"><div class="pitch"><span class="pitch-box pitch-box--top"></span><span class="pitch-box pitch-box--bottom"></span>
       ${state.lineup.starters.map((entry) => {
         const selected = players.find((player) => player.id === entry.playerId);
@@ -265,8 +283,9 @@ function playerTable(state) {
       const available = player.injuryWeeks <= 0 && !player.suspended;
       const isCaptain = state.lineup.captainId === player.id;
       const isPenalty = state.lineup.penaltyTakerId === player.id;
-      const status = player.injuryWeeks > 0 ? `<span class="status-tag status-tag--injured">負傷 ${player.injuryWeeks}週</span>` : player.suspended ? '<span class="status-tag status-tag--injured">出場停止</span>' : player.listed ? '<span class="status-tag status-tag--listed">売却候補</span>' : '<span class="status-tag">起用可</span>';
-      return `<tr data-squad-player="${player.id}" data-drag-player="${player.id}" draggable="${available}" data-name="${escapeHtml(player.name.toLowerCase())}" data-position="${player.position}" data-role="${roleKey}" data-role-rank="${roleRank}" data-overall="${player.overall}" data-potential="${player.potential}" data-fitness="${player.fitness}" data-morale="${player.morale}" data-age="${player.age}" data-wage="${player.wage}" class="${available ? 'is-draggable' : 'is-unavailable'}"><td><span class="drag-handle" title="フォーメーションへドラッグ" aria-hidden="true">⋮⋮</span></td><td><span class="player-name"><span class="player-avatar">${escapeHtml(player.name.split(' ').map((part) => part[0]).join('').slice(0,2))}</span><span><strong>${escapeHtml(player.name)}</strong><span>${player.age}歳 · ${player.appearances}試合 ${player.goals}得点</span></span></span></td><td><span class="position-tag">${player.position}</span> <span class="selection-role">${role}</span>${roleBadges(state, player.id)}</td><td><span class="rating-number">${player.overall}</span></td><td>${player.potential}</td><td>${status}</td><td>${player.fitness}${progressBar(player.fitness, '体力', player.fitness < 50 ? 'danger' : player.fitness < 70 ? 'warning' : 'accent')}</td><td>${player.morale}${progressBar(player.morale, '士気', player.morale < 50 ? 'danger' : 'accent')}</td><td>${money(player.wage)}</td><td>${player.contractYears}年</td><td><div class="actions"><button class="btn ${isCaptain ? 'btn--selected' : 'btn--ghost'} btn--sm" type="button" data-action="set-captain" data-player-id="${player.id}" aria-pressed="${isCaptain}" ${!starterIds.has(player.id) ? 'disabled' : ''}>主将${isCaptain ? ' ✓' : ''}</button><button class="btn ${isPenalty ? 'btn--selected' : 'btn--ghost'} btn--sm" type="button" data-action="set-penalty" data-player-id="${player.id}" aria-pressed="${isPenalty}" ${!starterIds.has(player.id) ? 'disabled' : ''}>PK${isPenalty ? ' ✓' : ''}</button><button class="btn ${player.listed ? 'btn--danger' : 'btn--ghost'} btn--sm" type="button" data-action="list-player" data-player-id="${player.id}">${player.listed ? '解除' : '売却候補'}</button>${player.listed ? `<button class="btn btn--secondary btn--sm" type="button" data-action="sell-player" data-player-id="${player.id}">売却交渉</button>` : ''}<button class="btn btn--ghost btn--sm" type="button" data-action="release-player" data-player-id="${player.id}" title="補償金: ${money(player.wage * 12)}">契約解除</button></div></td></tr>`;
+      const concernText = player.transferRequest ? '移籍希望' : player.concerns?.[0] ?? '';
+      const status = player.injuryWeeks > 0 ? `<span class="status-tag status-tag--injured">負傷 ${player.injuryWeeks}週</span>` : player.suspended ? '<span class="status-tag status-tag--injured">出場停止</span>' : player.retirementAnnounced ? '<span class="status-tag status-tag--listed">今季限りで引退</span>' : player.transferRequest ? '<span class="status-tag status-tag--injured">移籍希望</span>' : player.listed ? '<span class="status-tag status-tag--listed">売却候補</span>' : `<span class="status-tag">幸福度 ${player.happiness ?? player.morale}</span>${concernText ? `<small class="player-concern">${escapeHtml(concernText)}</small>` : ''}`;
+      return `<tr data-squad-player="${player.id}" data-drag-player="${player.id}" draggable="${available}" data-name="${escapeHtml(player.name.toLowerCase())}" data-position="${player.position}" data-role="${roleKey}" data-role-rank="${roleRank}" data-overall="${player.overall}" data-potential="${player.potential}" data-fitness="${player.fitness}" data-morale="${player.morale}" data-age="${player.age}" data-wage="${player.wage}" class="${available ? 'is-draggable' : 'is-unavailable'}"><td><span class="drag-handle" title="フォーメーションへドラッグ" aria-hidden="true">⋮⋮</span></td><td><span class="player-name"><span class="player-avatar">${escapeHtml(player.name.split(' ').map((part) => part[0]).join('').slice(0,2))}</span><span><strong>${escapeHtml(player.name)}</strong><span>${player.age}歳 · ${player.appearances}試合 ${player.goals}得点</span></span></span></td><td><span class="position-tag">${player.position}</span> <span class="selection-role">${role}</span>${roleBadges(state, player.id)}</td><td><span class="rating-number">${player.overall}</span></td><td>${player.potential}</td><td>${status}</td><td>${player.fitness}${progressBar(player.fitness, '体力', player.fitness < 50 ? 'danger' : player.fitness < 70 ? 'warning' : 'accent')}</td><td>${player.morale}${progressBar(player.morale, '士気', player.morale < 50 ? 'danger' : 'accent')}</td><td>${money(player.wage)}</td><td>${player.contractYears}年</td><td><div class="actions"><button class="btn ${isCaptain ? 'btn--selected' : 'btn--ghost'} btn--sm" type="button" data-action="set-captain" data-player-id="${player.id}" aria-pressed="${isCaptain}" ${!starterIds.has(player.id) ? 'disabled' : ''}>主将${isCaptain ? ' ✓' : ''}</button><button class="btn ${isPenalty ? 'btn--selected' : 'btn--ghost'} btn--sm" type="button" data-action="set-penalty" data-player-id="${player.id}" aria-pressed="${isPenalty}" ${!starterIds.has(player.id) ? 'disabled' : ''}>PK${isPenalty ? ' ✓' : ''}</button><button class="btn ${player.listed ? 'btn--danger' : 'btn--ghost'} btn--sm" type="button" data-action="list-player" data-player-id="${player.id}">${player.listed ? '解除' : '売却候補'}</button>${player.listed ? `<button class="btn btn--secondary btn--sm" type="button" data-action="sell-player" data-player-id="${player.id}">売却交渉</button>` : ''}<button class="btn btn--ghost btn--sm" type="button" data-action="renew-contract" data-player-id="${player.id}">契約更新</button><button class="btn btn--ghost btn--sm" type="button" data-action="release-player" data-player-id="${player.id}" title="補償金: ${money(player.wage * 12)}">契約解除</button></div></td></tr>`;
     }).join('')}
   </tbody></table></div></article>`;
 }
@@ -307,27 +326,33 @@ function renderTactics(state) {
     </section>`;
 }
 
-function standingsTable(state) {
-  return `<div class="table-wrap"><table class="data-table standings-table"><thead><tr><th>#</th><th>クラブ</th><th>試</th><th>勝</th><th>分</th><th>敗</th><th>得</th><th>失</th><th>差</th><th>勝点</th><th>フォーム</th></tr></thead><tbody>${state.standings.map((row, index) => {
+function standingsTable(state, division = userClub(state).division) {
+  const rows = state.standingsByDivision?.[division] ?? [];
+  return `<div class="table-wrap"><table class="data-table standings-table"><thead><tr><th>#</th><th>クラブ</th><th>試</th><th>勝</th><th>分</th><th>敗</th><th>得</th><th>失</th><th>差</th><th>勝点</th></tr></thead><tbody>${rows.map((row, index) => {
     const club = clubById(state, row.teamId);
-    return `<tr class="${row.teamId === state.userClubId ? 'is-user' : ''}"><td><span class="position-number ${index < 3 ? 'position-number--top' : ''}">${index + 1}</span></td><td><span class="team-cell">${clubBadge(club, 'sm')}<span><strong>${escapeHtml(club.name)}</strong></span></span></td><td>${row.played}</td><td>${row.won}</td><td>${row.drawn}</td><td>${row.lost}</td><td>${row.goalsFor}</td><td>${row.goalsAgainst}</td><td>${row.goalDifference > 0 ? '+' : ''}${row.goalDifference}</td><td><strong>${row.points}</strong></td><td>${formDots(row.form)}</td></tr>`;
+    const zone = index < 3 ? 'position-number--top' : index >= 17 && division < 3 ? 'position-number--danger' : '';
+    return `<tr class="${row.teamId === state.userClubId ? 'is-user' : ''}"><td><span class="position-number ${zone}">${index + 1}</span></td><td><span class="team-cell">${clubBadge(club, 'sm')}<span><strong>${escapeHtml(club.name)}</strong></span></span></td><td>${row.played}</td><td>${row.won}</td><td>${row.drawn}</td><td>${row.lost}</td><td>${row.goalsFor}</td><td>${row.goalsAgainst}</td><td>${row.goalDifference > 0 ? '+' : ''}${row.goalDifference}</td><td><strong>${row.points}</strong></td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
-function fixtureList(state) {
-  return Array.from({ length: 14 }, (_, index) => index + 1).map((week) => {
-    const fixtures = getWeekFixtures(state.fixtures, week);
-    return `<section class="fixture-week"><div class="fixture-week__label">MATCHWEEK ${week} ${week === Math.min(state.week, 14) && state.seasonStatus === 'active' ? '· NEXT' : ''}</div>${fixtures.map((fixture) => {
-      const home = clubById(state, fixture.homeId);
-      const away = clubById(state, fixture.awayId);
-      const isUser = [fixture.homeId, fixture.awayId].includes(state.userClubId);
-      return `<div class="fixture-row" ${isUser ? 'style="background:rgba(16,185,129,.035)"' : ''}><div class="fixture-team fixture-team--home"><span>${escapeHtml(home.name)}</span>${clubBadge(home, 'sm')}</div><div class="fixture-score ${fixture.played ? '' : 'fixture-score--upcoming'}">${fixture.played ? `${fixture.homeGoals} – ${fixture.awayGoals}` : '予定'}</div><div class="fixture-team">${clubBadge(away, 'sm')}<span>${escapeHtml(away.name)}</span></div>${fixture.played && fixture.reportId ? `<button class="btn btn--ghost btn--sm" type="button" data-open-report="${fixture.reportId}">詳細</button>` : '<span></span>'}</div>`;
-    }).join('')}</section>`;
+function userFixtureList(state) {
+  const league = (state.fixtures ?? []).filter((fixture) => [fixture.homeId, fixture.awayId].includes(state.userClubId));
+  const cupHistory = (state.cup?.history ?? []).flatMap((round) => round.fixtures ?? []);
+  const cupCurrent = state.cup?.fixtures ?? [];
+  const fixtures = [...league, ...cupHistory, ...cupCurrent]
+    .filter((fixture, index, all) => all.findIndex((item) => item.id === fixture.id) === index)
+    .sort((a, b) => a.week - b.week);
+  return fixtures.map((fixture) => {
+    const home = clubById(state, fixture.homeId);
+    const away = clubById(state, fixture.awayId);
+    const label = fixture.competitionName ?? (fixture.competition === 'cup' ? '全国王者杯' : home?.divisionName ?? 'リーグ');
+    return `<div class="fixture-row"><span class="fixture-competition">W${fixture.week}<small>${escapeHtml(label)}</small></span><div class="fixture-team fixture-team--home"><span>${escapeHtml(home?.name ?? '未定')}</span>${home ? clubBadge(home, 'sm') : ''}</div><div class="fixture-score ${fixture.played ? '' : 'fixture-score--upcoming'}">${fixture.played ? `${fixture.homeGoals} – ${fixture.awayGoals}${fixture.penaltyWinnerId ? ' (PK)' : ''}` : '予定'}</div><div class="fixture-team">${away ? clubBadge(away, 'sm') : ''}<span>${escapeHtml(away?.name ?? '未定')}</span></div>${fixture.played && fixture.reportId ? `<button class="btn btn--ghost btn--sm" type="button" data-open-report="${fixture.reportId}">詳細</button>` : '<span></span>'}</div>`;
   }).join('');
 }
 
 function renderSchedule(state) {
-  return `${pageHeader('schedule')}<section class="grid-2"><article class="card"><div class="card__header"><div><h3>リーグ順位表</h3><p>勝点 → 得失点差 → 得点の順で順位決定</p></div></div>${standingsTable(state)}</article><article class="card"><div class="card__header"><div><h3>全日程</h3><p>ダブルラウンドロビン · 全14節</p></div></div><div style="max-height:720px;overflow:auto">${fixtureList(state)}</div></article></section>`;
+  const cupChampion = state.cup?.championClubId ? clubById(state, state.cup.championClubId)?.name : null;
+  return `${pageHeader('schedule')}<section class="division-standings-grid">${[1,2,3].map((division) => `<article class="card"><div class="card__header"><div><h3>日本${division}部</h3><p>上位3クラブが昇格圏、下位3クラブが降格圏</p></div></div>${standingsTable(state, division)}</article>`).join('')}</section><section class="grid-equal" style="margin-top:14px"><article class="card"><div class="card__header"><div><h3>自クラブ全日程</h3><p>リーグ38節＋全国王者杯</p></div></div><div class="fixture-scroll">${userFixtureList(state)}</div></article><article class="card"><div class="card__header"><div><h3>全国王者杯</h3><p>全60クラブ参加・一発勝負</p></div></div><div class="card__body"><div class="attribute-row"><span>現在ラウンド</span><strong>${state.cup?.round ?? '終了'}</strong></div><div class="attribute-row"><span>残存クラブ</span><strong>${state.cup?.activeClubIds?.length ?? 0}</strong></div><div class="attribute-row"><span>優勝クラブ</span><strong>${escapeHtml(cupChampion ?? '未決定')}</strong></div>${(state.cup?.history ?? []).length ? `<div class="cup-round-list">${state.cup.history.map((round) => `<div><span>${escapeHtml(round.roundName ?? `第${round.round}回戦`)}</span><strong>${round.fixtures.length}試合</strong></div>`).join('')}</div>` : emptyState('大会はこれからです', '最初のカップ週までリーグ戦を進めてください。', 'trophy')}</div></article></section>`;
 }
 
 function renderTransfers(state) {
@@ -359,6 +384,129 @@ function renderAcademy(state) {
     ${prospects.length ? `<section class="prospect-grid" style="margin-top:14px">${prospects.map((player) => `<article class="card prospect-card"><div class="prospect-card__top"><div><span class="position-tag">${player.position}</span><h3 style="margin-top:9px">${escapeHtml(player.name)}</h3><p>${player.age}歳 · スカウト精度 ${player.scouting}%</p></div><span class="prospect-score">${player.overall}</span></div><div class="attribute-row"><span>ポテンシャル</span><strong>${player.potential}</strong></div>${progressBar((player.overall / player.potential) * 100, '成長進捗')}<div class="attribute-row"><span>攻撃 / 守備 / パス</span><strong>${player.attack} / ${player.defense} / ${player.passing}</strong></div><div class="attribute-row"><span>推定市場価値</span><strong>${money(player.value)}</strong></div><button class="btn btn--secondary" type="button" data-action="promote-prospect" data-player-id="${player.id}" ${player.age < 16 ? 'disabled' : ''}>${player.age < 16 ? '昇格可能年齢まで待つ' : 'トップチームへ昇格'}</button></article>`).join('')}</section>` : emptyState('アカデミーに選手がいません', '4週ごとのユース加入を待つか、育成施設を強化してください。', 'academy')}`;
 }
 
+function playerStatTable(state, players, career = false) {
+  const sorted = [...players].sort((a, b) => {
+    const left = career ? (a.clubCareerStats?.goals ?? 0) : (a.goals ?? 0);
+    const right = career ? (b.clubCareerStats?.goals ?? 0) : (b.goals ?? 0);
+    return right - left || a.name.localeCompare(b.name, 'ja');
+  });
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>選手</th><th>所属</th><th>出場</th><th>得点</th><th>アシスト</th><th>評価</th><th>MOM</th></tr></thead><tbody>${sorted.slice(0, 40).map((player) => {
+    const club = player.clubId ? clubById(state, player.clubId) : null;
+    const stats = career ? player.clubCareerStats ?? {} : player;
+    return `<tr><td><strong>${escapeHtml(player.name)}</strong><span class="selection-role">${escapeHtml(player.position ?? '–')}</span></td><td>${escapeHtml(club?.shortName ?? (player.clubId === state.userClubId ? userClub(state).shortName : '退団'))}</td><td>${stats.appearances ?? 0}</td><td><strong>${stats.goals ?? 0}</strong></td><td>${stats.assists ?? 0}</td><td>${career ? '–' : (player.seasonRating ?? 0).toFixed(1)}</td><td>${stats.manOfTheMatch ?? 0}</td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+
+function historicalUserPlayers(state) {
+  const sources = [
+    ...userPlayers(state),
+    ...(state.history?.departedPlayers ?? []),
+    ...(state.history?.retiredPlayers ?? [])
+  ];
+  const unique = new Map();
+  for (const player of sources) {
+    if (!player?.id) continue;
+    const hasUserHistory = player.clubId === state.userClubId || (player.seasonHistory ?? []).some((entry) => entry.clubId === state.userClubId);
+    if (!hasUserHistory) continue;
+    if (!unique.has(player.id)) unique.set(player.id, player);
+  }
+  return [...unique.values()];
+}
+
+function userSeasonRows(state, players) {
+  const rows = [];
+  for (const player of players) {
+    const seen = new Set();
+    for (const entry of player.seasonHistory ?? []) {
+      if (entry.clubId !== state.userClubId) continue;
+      const key = `${player.id}:${entry.season}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ playerId: player.id, playerName: player.name, position: player.position, ...entry });
+    }
+    const currentlyAtUserClub = player.clubId === state.userClubId && state.players.some((item) => item.id === player.id);
+    const departedThisSeason = player.clubId === state.userClubId && player.departureSeason === state.season;
+    const currentKey = `${player.id}:${state.season}`;
+    if ((currentlyAtUserClub || departedThisSeason) && !seen.has(currentKey)) {
+      rows.push({
+        playerId: player.id,
+        playerName: player.name,
+        position: player.position,
+        season: state.season,
+        clubId: state.userClubId,
+        division: userClub(state).division,
+        appearances: player.appearances ?? 0,
+        starts: player.starts ?? 0,
+        minutes: player.minutes ?? 0,
+        goals: player.goals ?? 0,
+        assists: player.assists ?? 0,
+        cleanSheets: player.cleanSheets ?? 0,
+        manOfTheMatch: player.manOfTheMatch ?? 0,
+        averageRating: player.seasonRating ?? 0
+      });
+    }
+  }
+  return rows.sort((a, b) => b.season - a.season || (b.goals ?? 0) - (a.goals ?? 0) || a.playerName.localeCompare(b.playerName, 'ja'));
+}
+
+function clubCareerPlayers(state) {
+  const players = historicalUserPlayers(state);
+  const rows = userSeasonRows(state, players);
+  const totals = new Map(players.map((player) => [player.id, {
+    id: player.id,
+    name: player.name,
+    position: player.position,
+    clubId: state.userClubId,
+    clubCareerStats: { appearances: 0, goals: 0, assists: 0, cleanSheets: 0, manOfTheMatch: 0 }
+  }]));
+  for (const row of rows) {
+    const player = totals.get(row.playerId);
+    if (!player) continue;
+    player.clubCareerStats.appearances += row.appearances ?? 0;
+    player.clubCareerStats.goals += row.goals ?? 0;
+    player.clubCareerStats.assists += row.assists ?? 0;
+    player.clubCareerStats.cleanSheets += row.cleanSheets ?? 0;
+    player.clubCareerStats.manOfTheMatch += row.manOfTheMatch ?? 0;
+  }
+  return [...totals.values()].filter((player) => player.clubCareerStats.appearances > 0 || player.clubCareerStats.goals > 0);
+}
+
+function clubRecordCards(state, players) {
+  const leaders = {
+    appearances: [...players].sort((a, b) => (b.clubCareerStats.appearances ?? 0) - (a.clubCareerStats.appearances ?? 0))[0],
+    goals: [...players].sort((a, b) => (b.clubCareerStats.goals ?? 0) - (a.clubCareerStats.goals ?? 0))[0],
+    assists: [...players].sort((a, b) => (b.clubCareerStats.assists ?? 0) - (a.clubCareerStats.assists ?? 0))[0],
+    cleanSheets: [...players].filter((player) => player.position === 'GK').sort((a, b) => (b.clubCareerStats.cleanSheets ?? 0) - (a.clubCareerStats.cleanSheets ?? 0))[0]
+  };
+  return `<section class="metrics-grid">${metricCard('最多出場', leaders.appearances?.name ?? '–', `${leaders.appearances?.clubCareerStats.appearances ?? 0}試合`, 'squad')}${metricCard('最多得点', leaders.goals?.name ?? '–', `${leaders.goals?.clubCareerStats.goals ?? 0}得点`, 'trophy')}${metricCard('最多アシスト', leaders.assists?.name ?? '–', `${leaders.assists?.clubCareerStats.assists ?? 0}アシスト`, 'star')}${metricCard('最多無失点', leaders.cleanSheets?.name ?? '–', `${leaders.cleanSheets?.clubCareerStats.cleanSheets ?? 0}試合`, 'shield')}</section>`;
+}
+
+function seasonHistoryTable(rows) {
+  if (!rows.length) return emptyState('シーズン別成績はまだありません', '試合を進めると選手ごとのシーズン記録が蓄積されます。', 'calendar');
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>シーズン</th><th>選手</th><th>部門</th><th>出場</th><th>得点</th><th>アシスト</th><th>評価</th></tr></thead><tbody>${rows.slice(0, 160).map((row) => `<tr><td>S${row.season}</td><td><strong>${escapeHtml(row.playerName)}</strong><span class="selection-role">${escapeHtml(row.position ?? '–')}</span></td><td>日本${row.division ?? '–'}部</td><td>${row.appearances ?? 0}</td><td><strong>${row.goals ?? 0}</strong></td><td>${row.assists ?? 0}</td><td>${(row.averageRating ?? 0).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function renderRecords(state) {
+  const current = [...state.players];
+  const careerPlayers = clubCareerPlayers(state);
+  const seasonRows = userSeasonRows(state, historicalUserPlayers(state));
+  const awards = state.history?.awards ?? [];
+  const scorer = [...state.players].sort((a,b)=>(b.goals??0)-(a.goals??0))[0];
+  const assister = [...state.players].sort((a,b)=>(b.assists??0)-(a.assists??0))[0];
+  return `${pageHeader('records')}<section class="metrics-grid">${metricCard('現在の得点王', scorer?.name ?? '–', `${scorer?.goals ?? 0}得点`, 'trophy')}${metricCard('現在のアシスト王', assister?.name ?? '–', `${assister?.assists ?? 0}アシスト`, 'star')}${metricCard('歴代シーズン', `${state.history?.seasons?.length ?? 0}`, '完了したシーズン', 'calendar')}${metricCard('引退・退団選手', `${(state.history?.retiredPlayers?.length ?? 0) + (state.history?.departedPlayers?.length ?? 0)}名`, 'クラブ在籍記録を保存', 'squad')}</section>
+    <div class="page-header page-header--compact" style="margin-top:22px"><div><h2>クラブ通算記録</h2><p>${escapeHtml(userClub(state).name)}で残した成績を、現役・退団・引退選手を通して集計します。</p></div></div>
+    ${clubRecordCards(state, careerPlayers)}
+    <section class="grid-equal" style="margin-top:14px"><article class="card"><div class="card__header"><div><h3>今季個人成績</h3><p>全3部のランキング</p></div></div>${playerStatTable(state, current, false)}</article><article class="card"><div class="card__header"><div><h3>自クラブ通算成績</h3><p>現役・退団・引退選手を含む</p></div></div>${careerPlayers.length ? playerStatTable(state, careerPlayers, true) : emptyState('通算記録はまだありません', '試合を進めるとクラブ記録が蓄積されます。', 'squad')}</article></section>
+    <article class="card" style="margin-top:14px"><div class="card__header"><div><h3>シーズン別成績</h3><p>自クラブ在籍時の個人成績履歴</p></div></div>${seasonHistoryTable(seasonRows)}</article>
+    <article class="card" style="margin-top:14px"><div class="card__header"><div><h3>個人タイトル履歴</h3><p>得点王・アシスト王・年間MVP・若手・GK・ベストXI</p></div></div><div class="card__body">${awards.length ? awards.map((award) => `<section class="award-season"><h4>シーズン ${award.season}</h4><div class="award-grid"><div><span>得点王</span><strong>${escapeHtml(award.topScorer?.playerName ?? '–')}</strong><small>${award.topScorer?.value ?? 0}得点</small></div><div><span>アシスト王</span><strong>${escapeHtml(award.topAssists?.playerName ?? '–')}</strong><small>${award.topAssists?.value ?? 0}</small></div><div><span>年間MVP</span><strong>${escapeHtml(award.playerOfTheYear?.playerName ?? '–')}</strong><small>${award.playerOfTheYear?.value ?? 0}</small></div><div><span>最優秀若手</span><strong>${escapeHtml(award.bestYoungPlayer?.playerName ?? '–')}</strong></div><div><span>最優秀GK</span><strong>${escapeHtml(award.bestGoalkeeper?.playerName ?? '–')}</strong></div></div></section>`).join('') : emptyState('まだ個人タイトルはありません', 'シーズン終了時に各賞が記録されます。', 'trophy')}</div></article>`;
+}
+
+function renderSecretary(state) {
+  const report = state.secretaryReport;
+  if (!report) return `${pageHeader('secretary')}${emptyState('レポートを準備中です', '次の週へ進むと秘書が情報を整理します。', 'star')}`;
+  return `${pageHeader('secretary')}<section class="metrics-grid">${metricCard('次戦', report.nextMatch?.opponentName ?? '予定なし', report.nextMatch ? `${report.nextMatch.competition} · WEEK ${report.nextMatch.week}` : 'シーズン終了', 'calendar')}${metricCard('平均体力', `${report.squad.averageFitness}%`, `負傷 ${report.squad.injured}名`, 'pulse', report.squad.averageFitness < 60 ? 'warning' : '')}${metricCard('移籍希望', `${report.squad.unhappy}名`, '不満と契約を確認', 'squad', report.squad.unhappy ? 'danger' : '')}${metricCard('配分可能現金', money(report.budgets.availableCash), `予備資金 ${money(report.budgets.reserveCash)}`, 'money')}</section><article class="card" style="margin-top:14px"><div class="card__header"><div><h3>秘書からの優先報告</h3><p>WEEK ${report.generatedWeek}時点</p></div></div><div class="card__body">${report.alerts.length ? `<div class="alert-list">${report.alerts.map((alert) => `<div class="alert-item"><span class="alert-item__icon">${icon(alert.type === 'budget' ? 'money' : alert.type === 'contract' ? 'calendar' : 'warning', 16)}</span><div><strong>${escapeHtml(alert.title)}</strong><span>${escapeHtml(alert.detail)}</span></div><button type="button" data-nav="${alert.view}">${icon('chevron', 16)}</button></div>`).join('')}</div>` : emptyState('緊急事項はありません', '選手状態・契約・予算に大きな問題はありません。', 'star')}</div></article><section class="grid-equal" style="margin-top:14px"><article class="card"><div class="card__header"><div><h3>次戦メモ</h3></div></div><div class="card__body">${report.nextMatch ? `<div class="attribute-row"><span>対戦相手</span><strong>${escapeHtml(report.nextMatch.opponentName)}</strong></div><div class="attribute-row"><span>大会</span><strong>${escapeHtml(report.nextMatch.competition)}</strong></div><div class="attribute-row"><span>会場</span><strong>${report.nextMatch.home ? 'ホーム' : 'アウェイ'}</strong></div><div class="attribute-row"><span>相手評判</span><strong>${report.nextMatch.opponentReputation}</strong></div>` : emptyState('次戦はありません', 'シーズン日程が完了しています。', 'calendar')}</div></article><article class="card"><div class="card__header"><div><h3>予算メモ</h3></div></div><div class="card__body"><div class="attribute-row"><span>現金</span><strong>${money(report.budgets.cash)}</strong></div><div class="attribute-row"><span>移籍予算</span><strong>${money(report.budgets.transferBudget)}</strong></div><div class="attribute-row"><span>給与予算</span><strong>${money(report.budgets.wageBudget)}</strong></div><button class="btn btn--secondary" type="button" data-nav="club">クラブ経営を開く</button></div></article></section>`;
+}
+
 const FACILITY_META = {
   training: ['トレーニングセンター', '選手の成長率と戦術理解の向上に影響します。', 'tactics'],
   academy: ['ユースアカデミー', '若手の初期能力・ポテンシャル・成長率に影響します。', 'academy'],
@@ -370,19 +518,9 @@ function renderClub(state) {
   const club = userClub(state);
   const wages = clubWeeklyWages(state, club.id);
   const ledger = state.finances.ledger.filter((item) => item.clubId === club.id).slice(0, 20);
-  return `${pageHeader('club')}
-    <section class="metrics-grid">
-      ${metricCard('現金残高', money(club.cash), `移籍予算 ${money(club.transferBudget)}`, 'money')}
-      ${metricCard('週間給与', money(wages), `上限 ${money(club.wageBudget)}`, 'pulse', wages > club.wageBudget * .9 ? 'warning' : '')}
-      ${metricCard('取締役会', `${club.boardConfidence}%`, `目標: ${escapeHtml(club.objective)}`, 'club', club.boardConfidence < 45 ? 'danger' : '')}
-      ${metricCard('ファン評価', `${club.fanMood}%`, `${club.capacity.toLocaleString('ja-JP')}席 · ${money(club.ticketPrice)}`, 'squad')}
-    </section>
-    <section class="facility-grid" style="margin-top:14px">${Object.entries(FACILITY_META).map(([id, [title, description, iconName]]) => {
-      const level = club.facilities[id];
-      const cost = facilityUpgradeCost(club, id);
-      return `<article class="card facility-card"><div class="facility-card__top"><div><span class="eyebrow">${icon(iconName, 15)} FACILITY</span><h3 style="margin-top:9px">${title}</h3><p>${description}</p></div><span class="prospect-score">${level}</span></div><div class="level-dots">${Array.from({length:5}, (_, index) => `<span class="level-dot ${index < level ? 'is-filled' : ''}"></span>`).join('')}</div><button class="btn btn--secondary" type="button" data-action="upgrade-facility" data-facility="${id}" ${cost === null || club.cash < cost ? 'disabled' : ''}>${cost === null ? '最大レベル' : `強化 ${money(cost)}`}</button></article>`;
-    }).join('')}</section>
-    <section class="grid-equal" style="margin-top:14px"><article class="card"><div class="card__header"><div><h3>財務履歴</h3><p>直近20件</p></div></div>${ledger.length ? `<div class="table-wrap"><table class="data-table" style="min-width:520px"><thead><tr><th>週</th><th>項目</th><th>区分</th><th>金額</th></tr></thead><tbody>${ledger.map((item) => `<tr><td>W${item.week}</td><td>${escapeHtml(item.label)}</td><td>${item.type === 'income' ? '<span class="text-accent">収入</span>' : '<span class="text-danger">支出</span>'}</td><td class="${item.amount >= 0 ? 'text-accent' : 'text-danger'}">${item.amount >= 0 ? '+' : ''}${formatMoney(item.amount)}</td></tr>`).join('')}</tbody></table></div>` : emptyState('財務履歴はありません', '試合週を進めると収入と支出が記録されます。', 'money')}</article><article class="card"><div class="card__header"><div><h3>クラブプロフィール</h3><p>${escapeHtml(club.city)} · ${escapeHtml(club.stadium)}</p></div>${clubBadge(club, 'md')}</div><div class="card__body"><div class="attribute-row"><span>評判</span><strong>${club.reputation}</strong></div>${progressBar(club.reputation, 'クラブ評判')}<div class="attribute-row"><span>スポンサー週間収入</span><strong>${money(club.sponsorWeekly)}</strong></div><div class="attribute-row"><span>スタジアム収容</span><strong>${club.capacity.toLocaleString('ja-JP')}人</strong></div><div class="attribute-row"><span>チケット価格</span><strong>${money(club.ticketPrice)}</strong></div><div class="attribute-row"><span>基本スタイル</span><strong>${escapeHtml(club.style)}</strong></div></div></article></section>`;
+  const available = Math.max(0, club.cash - (club.reserveCash ?? 0));
+  const allocationOptions = [50_000_000, 100_000_000, 300_000_000];
+  return `${pageHeader('club')}<section class="metrics-grid">${metricCard('現金残高', money(club.cash), `理事会予備 ${money(club.reserveCash ?? 0)}`, 'money')}${metricCard('移籍予算', money(club.transferBudget), `配分可能 ${money(available)}`, 'transfer')}${metricCard('週間給与', money(wages), `上限 ${money(club.wageBudget)}`, 'pulse', wages > club.wageBudget * .9 ? 'warning' : '')}${metricCard('所属リーグ', club.divisionName, `取締役会 ${club.boardConfidence}%`, 'trophy')}</section><article class="card" style="margin-top:14px"><div class="card__header"><div><h3>移籍予算の追加配分</h3><p>現金から予備資金を残して補強予算へ移します</p></div></div><div class="card__body"><div class="budget-actions">${allocationOptions.map((amount) => `<button class="btn btn--secondary" type="button" data-action="allocate-transfer-budget" data-amount="${amount}" ${available < amount ? 'disabled' : ''}>${money(amount)}を配分</button>`).join('')}</div></div></article><section class="facility-grid" style="margin-top:14px">${Object.entries(FACILITY_META).map(([id,[title,description,iconName]]) => { const level=club.facilities[id]; const cost=facilityUpgradeCost(club,id); return `<article class="card facility-card"><div class="facility-card__top"><div><span class="eyebrow">${icon(iconName,15)} FACILITY</span><h3 style="margin-top:9px">${title}</h3><p>${description}</p></div><span class="prospect-score">${level}</span></div><div class="level-dots">${Array.from({length:5},(_,index)=>`<span class="level-dot ${index<level?'is-filled':''}"></span>`).join('')}</div><button class="btn btn--secondary" type="button" data-action="upgrade-facility" data-facility="${id}" ${cost===null||club.cash<cost?'disabled':''}>${cost===null?'最大レベル':`強化 ${money(cost)}`}</button></article>`; }).join('')}</section><section class="project-grid" style="margin-top:14px">${Object.entries(PROJECTS).map(([id,project])=>{ const level=club.projects?.[id]??0; const cost=clubProjectCost(club,id); return `<article class="card facility-card"><div class="facility-card__top"><div><span class="eyebrow">LONG TERM PROJECT</span><h3>${escapeHtml(project.label)}</h3><p>レベル${level} · 週間維持費 ${money(project.weeklyMaintenance*level)}</p></div><span class="prospect-score">${level}</span></div><button class="btn btn--secondary" type="button" data-action="invest-project" data-project-id="${id}" ${club.cash-cost<(club.reserveCash??0)?'disabled':''}>投資 ${money(cost)}</button></article>`;}).join('')}</section><section class="grid-equal" style="margin-top:14px"><article class="card"><div class="card__header"><div><h3>財務履歴</h3><p>直近20件</p></div></div>${ledger.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>週</th><th>項目</th><th>区分</th><th>金額</th></tr></thead><tbody>${ledger.map((item)=>`<tr><td>W${item.week}</td><td>${escapeHtml(item.label)}</td><td>${item.type==='income'?'収入':'支出'}</td><td class="${item.amount>=0?'text-accent':'text-danger'}">${item.amount>=0?'+':''}${formatMoney(item.amount)}</td></tr>`).join('')}</tbody></table></div>`:emptyState('財務履歴はありません','試合週を進めると記録されます。','money')}</article><article class="card"><div class="card__header"><div><h3>クラブプロフィール</h3><p>${escapeHtml(club.city)} · ${escapeHtml(club.stadium)}</p></div>${clubBadge(club,'md')}</div><div class="card__body"><div class="attribute-row"><span>評判</span><strong>${club.reputation}</strong></div><div class="attribute-row"><span>スポンサー週間収入</span><strong>${money(club.sponsorWeekly)}</strong></div><div class="attribute-row"><span>スタジアム収容</span><strong>${club.capacity.toLocaleString('ja-JP')}人</strong></div><div class="attribute-row"><span>売却益還元率</span><strong>${Math.round((club.saleRetention??.75)*100)}%</strong></div></div></article></section>`;
 }
 
 function renderInbox(state) {
@@ -400,6 +538,8 @@ function renderView(state, currentView, uiState = {}) {
     case 'schedule': return renderSchedule(state);
     case 'transfers': return renderTransfers(state);
     case 'academy': return renderAcademy(state);
+    case 'records': return renderRecords(state);
+    case 'secretary': return renderSecretary(state);
     case 'club': return renderClub(state);
     case 'inbox': return renderInbox(state);
     default: return renderDashboard(state, uiState);
