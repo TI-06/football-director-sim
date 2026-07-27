@@ -12,6 +12,7 @@ import {
 } from './competitions.js';
 import { selectBestLineup, validateLineup, replaceStarter } from './squad.js';
 import { simulateMatch } from './match-engine.js';
+import { simulateAutomaticLiveMatch } from './live-match.js';
 import {
   settleWeeklyFinances,
   upgradeFacility,
@@ -36,6 +37,7 @@ import {
   updatePlayerHappiness
 } from './career.js';
 import { buildSecretaryReport } from './secretary.js';
+import { createDefaultMatchPlan, normalizeMatchPlan } from './match-plan.js';
 import { SAVE_SCHEMA_VERSION } from './save.js';
 
 const TACTIC_OPTIONS = {
@@ -91,9 +93,11 @@ function ensureCareerStats(player) {
 function updatePlayerAfterMatch(player, rating, result, fatigue) {
   ensureCareerStats(player);
   const previousAppearances = player.appearances || 0;
+  const minutes = Number.isFinite(rating.minutes) ? rating.minutes : 90;
+  const started = rating.started !== false;
   player.appearances = previousAppearances + 1;
-  player.starts = (player.starts || 0) + 1;
-  player.minutes = (player.minutes || 0) + 90;
+  player.starts = (player.starts || 0) + (started ? 1 : 0);
+  player.minutes = (player.minutes || 0) + minutes;
   player.seasonRating = previousAppearances === 0
     ? rating.rating
     : Math.round(((player.seasonRating * previousAppearances + rating.rating) / player.appearances) * 10) / 10;
@@ -101,15 +105,15 @@ function updatePlayerAfterMatch(player, rating, result, fatigue) {
   player.assists = (player.assists || 0) + rating.assists;
   player.yellowCards = (player.yellowCards || 0) + rating.cards;
   player.careerStats.appearances += 1;
-  player.careerStats.starts += 1;
-  player.careerStats.minutes += 90;
+  player.careerStats.starts += started ? 1 : 0;
+  player.careerStats.minutes += minutes;
   player.careerStats.goals += rating.goals;
   player.careerStats.assists += rating.assists;
   if (player.yellowCards >= 4) {
     player.suspended = true;
     player.yellowCards = 0;
   }
-  player.fitness = clamp(player.fitness - fatigue, 18, 100);
+  player.fitness = clamp(player.fitness - fatigue * Math.max(0.25, minutes / 90), 18, 100);
   const resultDelta = result === 'win' ? 4 : result === 'draw' ? 1 : -4;
   player.morale = clamp(player.morale + resultDelta + (rating.rating >= 7.5 ? 2 : rating.rating < 5.8 ? -2 : 0), 20, 100);
   player.form = clamp(player.form + resultDelta + Math.round((rating.rating - 6.5) * 2), 20, 100);
@@ -250,6 +254,7 @@ export function createNewGame({
     tactics,
     lineup,
     trainingFocus: 'balanced',
+    matchPlan: createDefaultMatchPlan(),
     inbox: createWelcomeInbox(selected, managerName, clubMode),
     matchReports: [],
     finances: { ledger: [] },
@@ -322,13 +327,11 @@ function storeUserReport(state, report, fixture, week) {
   state.lastMatchReportId = report.id;
 }
 
-function playFixture(state, fixture, week) {
-  const home = buildTeam(state, fixture.homeId);
-  const away = buildTeam(state, fixture.awayId);
-  const report = simulateMatch({ seed: `${state.seed}:season:${state.season}:week:${week}:${fixture.id}`, home, away });
+function applyFixtureReport(state, fixture, report, week) {
   const storedFixture = fixture.competition === 'cup'
     ? state.cup.fixtures.find((item) => item.id === fixture.id)
     : state.fixtures.find((item) => item.id === fixture.id);
+  if (!storedFixture || storedFixture.played) return null;
   storedFixture.played = true;
   storedFixture.homeGoals = report.homeGoals;
   storedFixture.awayGoals = report.awayGoals;
@@ -348,21 +351,17 @@ function playFixture(state, fixture, week) {
   return isUserMatch ? report : null;
 }
 
-export function playNextWeek(state) {
-  if (!state || state.seasonStatus !== 'active' || state.week > SEASON_WEEKS) {
-    return { ok: false, state, message: 'このシーズンの全日程は終了しています。', matchReport: null };
-  }
-  let next = recoverPlayers(state);
-  const training = applyWeeklyTraining(next, next.trainingFocus, createRng(`${next.seed}:training:${next.season}:${next.week}`));
-  next = training.state;
-  const week = next.week;
-  const fixtures = competitionFixturesForWeek(next, week);
-  let userReport = null;
+function playFixture(state, fixture, week) {
+  const home = buildTeam(state, fixture.homeId);
+  const away = buildTeam(state, fixture.awayId);
+  const report = simulateMatch({ seed: `${state.seed}:season:${state.season}:week:${week}:${fixture.id}`, home, away });
+  return applyFixtureReport(state, fixture, report, week);
+}
 
-  for (const fixture of fixtures) {
-    const report = playFixture(next, fixture, week);
-    if (report) userReport = report;
-  }
+function finishPreparedWeek(prepared, userReport) {
+  let next = prepared.state;
+  const { week, fixtures, userFixture } = prepared;
+  if (userFixture && userReport) applyFixtureReport(next, userFixture, userReport, week);
 
   if (fixtures.some((fixture) => fixture.competition === 'league')) {
     next.standingsByDivision = calculateDivisionStandings(next.clubs, next.fixtures);
@@ -372,7 +371,6 @@ export function playNextWeek(state) {
     next.cup = advanceCup(next.cup, `${next.seed}:season:${next.season}`);
   }
 
-  const userFixture = fixtures.find((fixture) => [fixture.homeId, fixture.awayId].includes(next.userClubId));
   if (userFixture && userReport) {
     const isHome = userFixture.homeId === next.userClubId;
     const userGoals = isHome ? userReport.homeGoals : userReport.awayGoals;
@@ -412,7 +410,63 @@ export function playNextWeek(state) {
   const players = clubPlayers(next, next.userClubId);
   if (!validateLineup(players, next.lineup, next.tactics.formation).valid) next.lineup = selectBestLineup(players, next.tactics.formation);
   next.secretaryReport = buildSecretaryReport(next);
-  return { ok: true, state: next, message: fixtures.length ? '試合週を完了しました。' : '準備週を完了しました。', matchReport: userReport, trainingSummary: training.summary };
+  return { ok: true, state: next, message: fixtures.length ? '試合週を完了しました。' : '準備週を完了しました。', matchReport: userReport, trainingSummary: prepared.trainingSummary };
+}
+
+export function prepareNextWeek(state) {
+  if (!state || state.seasonStatus !== 'active' || state.week > SEASON_WEEKS) {
+    return { ok: false, state, message: 'このシーズンの全日程は終了しています。', userFixture: null };
+  }
+  let next = recoverPlayers(state);
+  const training = applyWeeklyTraining(next, next.trainingFocus, createRng(`${next.seed}:training:${next.season}:${next.week}`));
+  next = training.state;
+  const week = next.week;
+  const fixtures = competitionFixturesForWeek(next, week);
+  const userFixture = fixtures.find((fixture) => [fixture.homeId, fixture.awayId].includes(next.userClubId)) ?? null;
+  for (const fixture of fixtures) {
+    if (userFixture && fixture.id === userFixture.id) continue;
+    playFixture(next, fixture, week);
+  }
+  const prepared = {
+    ok: true,
+    id: `prepared-${next.season}-${week}-${next.userClubId}`,
+    state: next,
+    week,
+    fixtures,
+    userFixture,
+    trainingSummary: training.summary,
+    completed: false,
+    matchSeed: userFixture ? `${next.seed}:season:${next.season}:week:${week}:${userFixture.id}` : null,
+    userSide: userFixture?.homeId === next.userClubId ? 'home' : 'away'
+  };
+  if (userFixture) {
+    prepared.home = buildTeam(next, userFixture.homeId);
+    prepared.away = buildTeam(next, userFixture.awayId);
+  }
+  return prepared;
+}
+
+export function completePreparedWeek(prepared, userReport = null) {
+  if (!prepared?.ok || prepared.completed) return { ok: false, state: prepared?.state ?? null, message: 'この試合週はすでに完了しています。' };
+  if (prepared.userFixture && !userReport) return { ok: false, state: prepared.state, message: '試合結果が必要です。' };
+  prepared.completed = true;
+  return finishPreparedWeek(prepared, userReport);
+}
+
+export function playNextWeek(state) {
+  const prepared = prepareNextWeek(state);
+  if (!prepared.ok) return { ...prepared, matchReport: null };
+  let userReport = null;
+  if (prepared.userFixture) {
+    userReport = simulateAutomaticLiveMatch({
+      seed: prepared.matchSeed,
+      home: prepared.home,
+      away: prepared.away,
+      userSide: prepared.userSide,
+      matchPlan: state.matchPlan ?? createDefaultMatchPlan()
+    });
+  }
+  return completePreparedWeek(prepared, userReport);
 }
 
 function replenishSquads(state) {
@@ -503,6 +557,16 @@ export function performAction(state, action) {
       next.updatedAt = Date.now();
       next.secretaryReport = buildSecretaryReport(next);
       return { ok: true, state: next, message: '戦術を更新しました。' };
+    }
+    case 'update-match-plan': {
+      const next = deepClone(state);
+      const current = next.matchPlan ?? createDefaultMatchPlan();
+      const scoreTactics = payload.scoreTactics
+        ? Object.fromEntries(['leading', 'drawing', 'trailing'].map((scoreState) => [scoreState, { ...current.scoreTactics?.[scoreState], ...payload.scoreTactics?.[scoreState] }]))
+        : current.scoreTactics;
+      next.matchPlan = normalizeMatchPlan({ ...current, ...payload, scoreTactics });
+      next.updatedAt = Date.now();
+      return { ok: true, state: next, message: '試合プランを更新しました。' };
     }
     case 'update-training': {
       const next = deepClone(state);

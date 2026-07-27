@@ -1,7 +1,9 @@
-import { createNewGame, performAction, playNextWeek } from '../game/game-engine.js';
+import { completePreparedWeek, createNewGame, performAction, playNextWeek, prepareNextWeek } from '../game/game-engine.js';
+import { advanceLiveMatchSession, createLiveMatchSession, finalizeLiveMatch, makeLiveSubstitution } from '../game/live-match.js';
 import { deserializeGame, serializeGame } from '../game/save.js';
-import { autoAdvanceStopReason, unresolvedDecisionIds } from './auto-advance.js';
-import { renderApplication, renderMatchModal, renderNewGame } from './render.js';
+import { autoAdvanceStopReason, importantFixtureReason, unresolvedDecisionIds } from './auto-advance.js';
+import { renderApplication, renderLiveMatchCenter, renderMatchModal, renderNewGame } from './render.js';
+import { createConfirmDialog, createMenuDialog, renderGameDialog } from './dialogs.js';
 import { compareSquadRows, matchesSquadFilters } from './squad-controls.js';
 
 const STORAGE_KEY = 'football-director-save-v2';
@@ -15,6 +17,10 @@ let autoAdvanceActive = false;
 let autoAdvanceMessage = '';
 let draggedPlayerId = null;
 let draggedElement = null;
+let preparedWeek = null;
+let liveMatchSession = null;
+let dialogConfirmHandler = null;
+let dialogReturnFocus = null;
 
 const squadViewState = {
   sort: 'role',
@@ -133,6 +139,158 @@ async function importSave(file) {
   }
 }
 
+function closeDialog() {
+  const root = elements().modalRoot;
+  const dialog = root.querySelector('[data-game-dialog]');
+  if (!dialog) return false;
+  root.innerHTML = '';
+  dialogConfirmHandler = null;
+  document.body.style.overflow = '';
+  if (dialogReturnFocus?.isConnected) dialogReturnFocus.focus();
+  dialogReturnFocus = null;
+  return true;
+}
+
+function openDialog(dialog, onConfirm = null) {
+  const { modalRoot } = elements();
+  dialogReturnFocus = document.activeElement;
+  dialogConfirmHandler = onConfirm;
+  modalRoot.innerHTML = renderGameDialog(dialog);
+  document.body.style.overflow = 'hidden';
+  window.setTimeout(() => modalRoot.querySelector('[data-dialog-confirm], [data-dialog-nav], [data-dialog-command], [data-dialog-cancel]')?.focus(), 0);
+}
+
+function confirmAction(options, handler) {
+  openDialog(createConfirmDialog(options), () => {
+    closeDialog();
+    handler();
+  });
+}
+
+function openGameMenu() {
+  openDialog(createMenuDialog({
+    title: 'クラブメニュー',
+    message: 'よく使う画面は下のナビに固定されています。その他の機能はこちらから開けます。',
+    items: [
+      { label: '戦術・試合プラン', description: '戦術と自動交代条件', icon: 'tactics', nav: 'tactics' },
+      { label: 'ユースアカデミー', description: '若手の育成と昇格', icon: 'academy', nav: 'academy' },
+      { label: '記録・タイトル', description: '個人成績と歴代記録', icon: 'trophy', nav: 'records' },
+      { label: '秘書レポート', description: '今週の重要事項', icon: 'star', nav: 'secretary' },
+      { label: 'クラブ経営', description: '財務・施設・投資', icon: 'club', nav: 'club' },
+      { label: '受信トレイ', description: '判断イベントと連絡', icon: 'inbox', nav: 'inbox' },
+      { label: 'セーブを書き出す', icon: 'download', command: 'export-save' },
+      { label: 'セーブを読み込む', icon: 'upload', command: 'import-save' },
+      { label: 'キャリアをリセット', icon: 'reset', command: 'reset-game', danger: true }
+    ]
+  }));
+}
+
+function renderLiveMatch() {
+  if (!liveMatchSession) return;
+  elements().modalRoot.innerHTML = renderLiveMatchCenter(state, liveMatchSession);
+  document.body.style.overflow = 'hidden';
+}
+
+function collectLiveTactics() {
+  return Object.fromEntries([...elements().modalRoot.querySelectorAll('[data-live-tactic]')].map((control) => [control.dataset.liveTactic, control.value]));
+}
+
+function beginLiveWeek() {
+  const prepared = prepareNextWeek(state);
+  if (!prepared.ok) {
+    notify(prepared.message, 'error');
+    return;
+  }
+  if (!prepared.userFixture) {
+    const completed = completePreparedWeek(prepared, null);
+    if (!completed.ok) {
+      notify(completed.message, 'error');
+      return;
+    }
+    state = completed.state;
+    persist();
+    render();
+    return;
+  }
+  preparedWeek = prepared;
+  liveMatchSession = createLiveMatchSession({
+    seed: prepared.matchSeed,
+    home: prepared.home,
+    away: prepared.away,
+    userSide: prepared.userSide,
+    matchPlan: state.matchPlan
+  });
+  renderLiveMatch();
+}
+
+function advanceLiveMatch() {
+  if (!liveMatchSession || liveMatchSession.completed) return;
+  const result = advanceLiveMatchSession(liveMatchSession, { tactics: collectLiveTactics(), autoPlan: true });
+  if (!result.ok) {
+    notify(result.message, 'error');
+    return;
+  }
+  liveMatchSession = result.session;
+  renderLiveMatch();
+}
+
+function skipLiveMatch() {
+  if (!liveMatchSession) return;
+  let next = liveMatchSession;
+  while (!next.completed) {
+    const result = advanceLiveMatchSession(next, { autoPlan: true });
+    if (!result.ok) {
+      notify(result.message, 'error');
+      return;
+    }
+    next = result.session;
+  }
+  liveMatchSession = next;
+  renderLiveMatch();
+}
+
+function substituteLivePlayer() {
+  if (!liveMatchSession) return;
+  const root = elements().modalRoot;
+  const playerOutId = root.querySelector('[data-live-player-out]')?.value;
+  const playerInId = root.querySelector('[data-live-player-in]')?.value;
+  if (!playerOutId || !playerInId) {
+    notify('交代する選手と投入する選手を選んでください。', 'error');
+    return;
+  }
+  const result = makeLiveSubstitution(liveMatchSession, {
+    side: liveMatchSession.userSide,
+    playerOutId,
+    playerInId,
+    reason: 'manual'
+  });
+  if (!result.ok) {
+    notify(result.message, 'error');
+    return;
+  }
+  liveMatchSession = result.session;
+  renderLiveMatch();
+  notify(result.message);
+}
+
+function finishLiveWeek() {
+  if (!preparedWeek || !liveMatchSession?.completed) return;
+  const report = finalizeLiveMatch(liveMatchSession);
+  const completed = completePreparedWeek(preparedWeek, report);
+  if (!completed.ok) {
+    notify(completed.message, 'error');
+    return;
+  }
+  state = completed.state;
+  preparedWeek = null;
+  liveMatchSession = null;
+  elements().modalRoot.innerHTML = '';
+  document.body.style.overflow = '';
+  persist();
+  render();
+  notify('試合結果を確定しました。');
+}
+
 function clearMatchTimer() {
   if (matchTimer) window.clearInterval(matchTimer);
   matchTimer = null;
@@ -197,22 +355,18 @@ function closeMatch() {
 }
 
 function playWeek() {
-  if (!state) return;
+  if (!state || liveMatchSession) return;
   if (autoAdvanceActive) cancelAutoAdvance();
-  const result = playNextWeek(state);
-  if (!result.ok) {
-    notify(result.message, 'error');
-    return;
-  }
-  state = result.state;
-  autoAdvanceMessage = '';
-  persist();
-  render();
-  if (result.matchReport) openMatch(result.matchReport, false);
+  beginLiveWeek();
 }
 
 function runAutoAdvanceStep() {
   if (!autoAdvanceActive || !state) return;
+  const importantReason = importantFixtureReason(state);
+  if (importantReason) {
+    stopAutoAdvance(`${importantReason}のため手動指揮へ切り替えました。`, { notifyUser: true });
+    return;
+  }
   const week = state.week;
   const decisionsBefore = new Set(unresolvedDecisionIds(state));
   autoAdvanceMessage = `WEEK ${week}を自動進行中`;
@@ -371,16 +525,26 @@ function handleClick(event) {
   if (command === 'start-next-season') return applyAction('start-next-season');
   if (command === 'export-save') return exportSave();
   if (command === 'import-save') return elements().importInput.click();
+  if (command === 'open-game-menu') return openGameMenu();
   if (command === 'reset-game') {
-    if (window.confirm('現在のキャリアを削除して最初から始めますか？')) {
+    confirmAction({
+      id: 'reset-career',
+      title: 'キャリアを最初からやり直しますか？',
+      message: '現在のクラブ、選手、シーズン記録をこの端末から削除します。',
+      detail: 'この操作は取り消せません。必要なら先にセーブを書き出してください。',
+      confirmLabel: 'キャリアを削除',
+      tone: 'danger'
+    }, () => {
       cancelAutoAdvance();
       closeMatch();
+      preparedWeek = null;
+      liveMatchSession = null;
       localStorage.removeItem(STORAGE_KEY);
       state = null;
       currentView = 'dashboard';
       render();
       notify('キャリアをリセットしました。');
-    }
+    });
     return;
   }
 
@@ -388,39 +552,40 @@ function handleClick(event) {
   if (actionElement) {
     const action = actionElement.dataset.action;
     const playerId = actionElement.dataset.playerId;
+    const player = state?.players.find((item) => item.id === playerId) ?? state?.transferMarket.find((item) => item.id === playerId);
     if (action === 'auto-lineup') return applyAction('auto-lineup');
     if (action === 'set-captain') return applyAction('set-captain', { playerId });
     if (action === 'set-penalty') return applyAction('set-penalty-taker', { playerId });
     if (action === 'list-player') return applyAction('list-player', { playerId });
     if (action === 'sell-player') {
-      if (window.confirm('移籍オファーを受けてこの選手を売却しますか？')) applyAction('sell-player', { playerId });
+      confirmAction({ id: 'sell-player', title: `${player?.name ?? '選手'}を売却しますか？`, message: '届いている移籍オファーを受諾し、選手をクラブから放出します。', detail: '売却益の一部が移籍予算へ還元されます。', confirmLabel: 'オファーを受諾', tone: 'warning' }, () => applyAction('sell-player', { playerId }));
       return;
     }
     if (action === 'release-player') {
-      if (window.confirm('12週分の給与を補償金として支払い、この選手との契約を解除しますか？')) applyAction('release-player', { playerId });
+      confirmAction({ id: 'release-player', title: `${player?.name ?? '選手'}との契約を解除しますか？`, message: '12週分の給与を補償金として支払い、選手を自由契約にします。', detail: 'スカッド人数と残り資金を確認してください。', confirmLabel: '契約を解除', tone: 'danger' }, () => applyAction('release-player', { playerId }));
       return;
     }
     if (action === 'scout-player') return applyAction('scout-player', { playerId });
     if (action === 'buy-player') {
-      if (window.confirm('移籍金と給与条件に合意して獲得しますか？')) applyAction('buy-player', { playerId });
+      confirmAction({ id: 'buy-player', title: `${player?.name ?? '選手'}を獲得しますか？`, message: '移籍金と給与条件に合意してトップチームへ迎えます。', detail: player ? `OVR ${player.overall} · ${player.position} · ${player.age}歳` : '', confirmLabel: '獲得を決定' }, () => applyAction('buy-player', { playerId }));
       return;
     }
     if (action === 'promote-prospect') return applyAction('promote-prospect', { playerId });
     if (action === 'renew-contract') {
-      if (window.confirm('3年契約で更新しますか？更新時に契約金が発生します。')) applyAction('renew-contract', { playerId, years: 3 });
+      confirmAction({ id: 'renew-contract', title: `${player?.name ?? '選手'}と契約更新しますか？`, message: '3年契約を提示します。更新時には契約金が発生します。', confirmLabel: '3年契約を提示' }, () => applyAction('renew-contract', { playerId, years: 3 }));
       return;
     }
     if (action === 'allocate-transfer-budget') {
       const amount = Number(actionElement.dataset.amount);
-      if (window.confirm(`${Math.round(amount / 100_000_000)}億円を移籍予算へ配分しますか？`)) applyAction('allocate-transfer-budget', { amount });
+      confirmAction({ id: 'allocate-budget', title: '補強予算を追加しますか？', message: `${Math.round(amount / 100_000_000)}億円をクラブ現金から移籍予算へ振り替えます。`, detail: 'クラブの予備資金は維持されます。', confirmLabel: '予算を配分' }, () => applyAction('allocate-transfer-budget', { amount }));
       return;
     }
     if (action === 'invest-project') {
-      if (window.confirm('継続投資を実行しますか？毎週の維持費も増加します。')) applyAction('invest-project', { projectId: actionElement.dataset.projectId });
+      confirmAction({ id: 'invest-project', title: '長期プロジェクトへ投資しますか？', message: 'クラブの成長効果とともに毎週の維持費も増加します。', confirmLabel: '投資を実行' }, () => applyAction('invest-project', { projectId: actionElement.dataset.projectId }));
       return;
     }
     if (action === 'upgrade-facility') {
-      if (window.confirm('クラブ資金を使って施設を強化しますか？')) applyAction('upgrade-facility', { facility: actionElement.dataset.facility });
+      confirmAction({ id: 'upgrade-facility', title: '施設を強化しますか？', message: 'クラブ資金を使用して施設レベルを引き上げます。', confirmLabel: '施設を強化' }, () => applyAction('upgrade-facility', { facility: actionElement.dataset.facility }));
       return;
     }
     if (action === 'resolve-event') return applyAction('resolve-event', { eventId: actionElement.dataset.eventId, choiceId: actionElement.dataset.choiceId });
@@ -434,6 +599,18 @@ function handleClick(event) {
 }
 
 function handleChange(event) {
+  if (event.target.matches('[data-match-plan-key]')) {
+    const key = event.target.dataset.matchPlanKey;
+    const value = event.target.type === 'checkbox' ? event.target.checked : Number(event.target.value);
+    applyAction('update-match-plan', { [key]: value });
+    return;
+  }
+  if (event.target.matches('[data-match-plan-score]')) {
+    const scoreState = event.target.dataset.matchPlanScore;
+    const key = event.target.dataset.matchPlanScoreKey;
+    applyAction('update-match-plan', { scoreTactics: { [scoreState]: { [key]: event.target.value } } });
+    return;
+  }
   if (event.target.matches('[data-lineup-slot]')) {
     applyAction('replace-starter', { slotId: event.target.dataset.lineupSlot, playerId: event.target.value });
     return;
@@ -474,6 +651,10 @@ function handleChange(event) {
 
 function handleInput(event) {
   if (event.target.matches('[data-market-search]')) filterMarket();
+  if (event.target.matches('input[type="range"][data-match-plan-key]')) {
+    const output = event.target.closest('.match-plan-control')?.querySelector('output');
+    if (output) output.textContent = `${event.target.value}${event.target.dataset.matchPlanKey === 'substitutionMinute' ? '分' : event.target.dataset.matchPlanKey === 'fitnessThreshold' ? '%' : '人'}`;
+  }
 }
 
 function handleSubmit(event) {
@@ -518,21 +699,76 @@ function bindEvents() {
     if (file) importSave(file);
   });
   modalRoot.addEventListener('click', (event) => {
+    const dialogNav = event.target.closest('[data-dialog-nav]');
+    if (dialogNav) {
+      const view = dialogNav.dataset.dialogNav;
+      closeDialog();
+      currentView = view;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const dialogCommand = event.target.closest('[data-dialog-command]')?.dataset.dialogCommand;
+    if (dialogCommand) {
+      closeDialog();
+      if (dialogCommand === 'export-save') exportSave();
+      if (dialogCommand === 'import-save') elements().importInput.click();
+      if (dialogCommand === 'reset-game') handleClick({ target: app.querySelector('[data-command="reset-game"]') ?? document.createElement('span') });
+      return;
+    }
+    if (event.target.closest('[data-dialog-confirm]')) {
+      const handler = dialogConfirmHandler;
+      if (handler) handler();
+      else closeDialog();
+      return;
+    }
+    if (event.target.closest('[data-dialog-cancel]')) {
+      closeDialog();
+      return;
+    }
+    if (event.target.closest('[data-command="live-advance"]')) return advanceLiveMatch();
+    if (event.target.closest('[data-command="live-substitute"]')) return substituteLivePlayer();
+    if (event.target.closest('[data-command="live-skip"]')) return skipLiveMatch();
+    if (event.target.closest('[data-command="live-finish"]')) return finishLiveWeek();
     if (event.target.closest('[data-match-skip]')) {
       const reportId = state.lastMatchReportId;
       const report = state.matchReports.find((item) => item.id === reportId);
       if (report) finishMatchPlayback(report);
+      return;
     }
-    if (event.target.closest('[data-match-close]')) closeMatch();
-    if (event.target.classList.contains('modal-backdrop')) {
+    if (event.target.closest('[data-match-close]')) {
+      closeMatch();
+      return;
+    }
+    if (event.target.matches('[data-dialog-backdrop]')) closeDialog();
+    if (event.target.classList.contains('modal-backdrop') && !liveMatchSession) {
       const closeButton = modalRoot.querySelector('[data-match-close]');
       if (closeButton && !closeButton.disabled) closeMatch();
     }
   });
   document.addEventListener('keydown', (event) => {
+    const dialog = modalRoot.querySelector('[data-game-dialog]');
     if (event.key === 'Escape') {
+      if (dialog) {
+        closeDialog();
+        return;
+      }
+      if (liveMatchSession) return;
       const closeButton = modalRoot.querySelector('[data-match-close]');
       if (closeButton && !closeButton.disabled) closeMatch();
+    }
+    if (event.key === 'Tab' && dialog) {
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]), select:not([disabled]), input:not([disabled])')];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   });
 }
