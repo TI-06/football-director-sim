@@ -21,6 +21,10 @@ jobs:
         shell: bash
         run: |
           if [ -d .source-japan ]; then
+            if [ -d .source-japan-fix ]; then
+              cat .source-japan-fix/part* > .source-japan/chunk06
+              rm -rf .source-japan-fix
+            fi
             cat .source-japan/chunk* | base64 --decode > /tmp/japan-career.tgz
             echo "39c2e8d3b5990c4a83b80fd3f1a68e988ec8d3fc2fb0538fd41b691a0af6845a  /tmp/japan-career.tgz" | sha256sum --check --strict
             tar -xzf /tmp/japan-career.tgz -C .
