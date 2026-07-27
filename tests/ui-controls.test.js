@@ -33,3 +33,16 @@ test('auto advance stops for a newly created decision and season completion', ()
   assert.equal(autoAdvanceStopReason(new Set(), { ...after, seasonStatus: 'complete', inbox: [] }), 'season-complete');
   assert.equal(autoAdvanceStopReason(new Set(), { ...after, seasonStatus: 'complete' }), 'decision');
 });
+
+test('auto advance identifies important late-round cup fixtures for the user club', async () => {
+  const { importantFixtureReason } = await import('../src/ui/auto-advance.js');
+  const state = {
+    week: 35,
+    userClubId: 'club-a',
+    matchPlan: { stopImportantMatches: true },
+    fixtures: [],
+    cup: { fixtures: [{ week: 35, round: 6, homeId: 'club-a', awayId: 'club-b', played: false }] }
+  };
+  assert.equal(importantFixtureReason(state), '全国王者杯の重要試合');
+  assert.equal(importantFixtureReason({ ...state, matchPlan: { stopImportantMatches: false } }), null);
+});

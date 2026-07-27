@@ -45,6 +45,10 @@ for (const file of jsFiles) {
     failures += 1;
     console.error(`[placeholder] ${path.relative(root, file)} contains TODO/TBD/FIXME`);
   }
+  if (file.includes(`${path.sep}src${path.sep}`) && /(?:window\.)?(?:alert|confirm|prompt)\s*\(/.test(source)) {
+    failures += 1;
+    console.error(`[dialog] ${path.relative(root, file)} uses a browser-native dialog`);
+  }
 }
 
 const html = await readFile(path.join(root, 'index.html'), 'utf8');

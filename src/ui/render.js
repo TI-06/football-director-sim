@@ -74,13 +74,21 @@ function overallSquadMetrics(state) {
   };
 }
 
+const MOBILE_NAV_ITEMS = [
+  ['dashboard', 'ホーム', 'dashboard'],
+  ['schedule', '試合', 'calendar'],
+  ['squad', 'スカッド', 'squad'],
+  ['transfers', '移籍', 'transfer']
+];
+
 function navHtml(state, currentView, mobile = false) {
   const unresolved = state.inbox.filter((item) => item.kind === 'decision' && !item.resolved).length;
-  return `<nav class="${mobile ? 'mobile-nav' : 'nav'}" aria-label="メインメニュー">
-    ${NAV_ITEMS.map(([id, label, iconName]) => `<button class="nav__item ${currentView === id ? 'is-active' : ''}" type="button" data-nav="${id}" aria-current="${currentView === id ? 'page' : 'false'}">
-      ${icon(iconName, mobile ? 18 : 19)}<span>${escapeHtml(label)}</span>${id === 'inbox' && unresolved ? `<b class="nav__badge">${unresolved}</b>` : ''}
-    </button>`).join('')}
-  </nav>`;
+  const items = mobile ? MOBILE_NAV_ITEMS : NAV_ITEMS;
+  const buttons = items.map(([id, label, iconName]) => `<button class="nav__item ${currentView === id ? 'is-active' : ''}" type="button" data-nav="${id}" aria-current="${currentView === id ? 'page' : 'false'}">
+      ${icon(iconName, mobile ? 19 : 19)}<span>${escapeHtml(label)}</span>${id === 'inbox' && unresolved ? `<b class="nav__badge">${unresolved}</b>` : ''}
+    </button>`).join('');
+  const menuButton = mobile ? `<button class="nav__item ${!MOBILE_NAV_ITEMS.some(([id]) => id === currentView) ? 'is-active' : ''}" type="button" data-command="open-game-menu" aria-label="その他のメニュー">${icon('club', 19)}<span>メニュー</span>${unresolved ? `<b class="nav__badge">${unresolved}</b>` : ''}</button>` : '';
+  return `<nav class="${mobile ? 'mobile-nav' : 'nav'}" aria-label="メインメニュー">${buttons}${menuButton}</nav>`;
 }
 
 export function renderNewGame() {
@@ -221,7 +229,7 @@ function renderDashboard(state, uiState = {}) {
     return `<tr class="${row.teamId === state.userClubId ? 'is-user' : ''}"><td>${index + 1}</td><td><span class="team-cell">${clubBadge(rowClub, 'sm')}<span>${escapeHtml(rowClub.name)}</span></span></td><td>${row.played}</td><td>${row.goalDifference > 0 ? '+' : ''}${row.goalDifference}</td><td><strong>${row.points}</strong></td></tr>`;
   }).join('');
 
-  return `${pageHeader('dashboard')}
+  return `<div class="game-command-hub">${pageHeader('dashboard')}
     <section class="metrics-grid">
       ${metricCard('リーグ順位', `${position}位`, `勝点 ${state.standings.find((row) => row.teamId === state.userClubId)?.points ?? 0}`, 'trophy')}
       ${metricCard('クラブ資金', money(club.cash), `移籍予算 ${money(club.transferBudget)}`, 'money')}
@@ -235,7 +243,15 @@ function renderDashboard(state, uiState = {}) {
     <section class="grid-equal" style="margin-top:14px">
       <article class="card"><div class="card__header"><div><h3>優先受信トレイ</h3><p>未処理の判断事項</p></div><button class="btn btn--ghost btn--sm" type="button" data-nav="inbox">すべて見る</button></div><div class="card__body">${unresolved.length ? `<div class="alert-list">${unresolved.map((item) => `<div class="alert-item"><span class="alert-item__icon">${icon('inbox', 16)}</span><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.category)} · WEEK ${item.week}</span></div><button type="button" data-nav="inbox">${icon('chevron', 16)}</button></div>`).join('')}</div>` : emptyState('未処理事項はありません', '次の試合へ進むと新しい連絡が届くことがあります。')}</div></article>
       <article class="card"><div class="card__header"><div><h3>スカッドアラート</h3><p>起用前に確認したい状態</p></div><button class="btn btn--ghost btn--sm" type="button" data-nav="squad">スカッドへ</button></div><div class="card__body">${alerts.length ? `<div class="alert-list">${alerts.map((item) => `<div class="alert-item"><span class="alert-item__icon">${icon('warning', 16)}</span><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.detail)}</span></div><button type="button" data-nav="${item.view}">${icon('chevron', 16)}</button></div>`).join('')}</div>` : emptyState('大きな問題はありません', '先発候補のコンディションは整っています。', 'squad')}</div></article>
-    </section>`;
+    </section>
+    <section class="dashboard-quick-actions" aria-label="クイック操作">
+      <button type="button" data-nav="squad">${icon('squad', 20)}<span><strong>先発を確認</strong><small>配置・体力・役割</small></span></button>
+      <button type="button" data-nav="tactics">${icon('tactics', 20)}<span><strong>試合プラン</strong><small>戦術と交代条件</small></span></button>
+      <button type="button" data-nav="secretary">${icon('star', 20)}<span><strong>秘書レポート</strong><small>今週の要注意事項</small></span></button>
+      <button type="button" data-nav="inbox">${icon('inbox', 20)}<span><strong>受信トレイ</strong><small>未処理 ${unresolved.length}件</small></span></button>
+    </section>
+    <div class="mobile-continue-bar"><div><small>${fixture ? `${escapeHtml(fixture.competitionName ?? club.divisionName)} · WEEK ${fixture.week}` : `SEASON ${state.season}`}</small><strong>${fixture ? '次の試合を指揮する' : '次シーズンへ進む'}</strong></div><button class="btn btn--primary" type="button" data-command="${state.seasonStatus === 'active' ? 'play-week' : 'start-next-season'}" ${uiState.autoAdvanceActive ? 'disabled' : ''}>${icon(state.seasonStatus === 'active' ? 'play' : 'trophy', 18)} 進む</button></div>
+  </div>`;
 }
 
 function roleBadges(state, playerId) {
@@ -304,6 +320,36 @@ const TACTIC_LABELS = {
   focus: ['攻撃の重点', { left: '左', balanced: 'バランス', right: '右', middle: '中央' }, '相手の弱点や自軍の主力に合わせて攻撃経路を調整します。']
 };
 
+function matchPlanNumberControl(key, label, value, min, max, suffix) {
+  return `<label class="match-plan-control"><span>${escapeHtml(label)}</span><div><input type="range" min="${min}" max="${max}" value="${value}" data-match-plan-key="${key}"><output>${value}${suffix}</output></div></label>`;
+}
+
+function matchPlanReaction(stateName, label, plan) {
+  const mentalityOptions = TACTIC_LABELS.mentality[1];
+  const pressingOptions = TACTIC_LABELS.pressing[1];
+  const tempoOptions = TACTIC_LABELS.tempo[1];
+  const reaction = plan.scoreTactics[stateName];
+  const select = (key, options) => `<select class="control-select" data-match-plan-score="${stateName}" data-match-plan-score-key="${key}">${Object.entries(options).map(([value, text]) => `<option value="${value}" ${reaction[key] === value ? 'selected' : ''}>${text}</option>`).join('')}</select>`;
+  return `<div class="score-reaction"><strong>${escapeHtml(label)}</strong><label><span>姿勢</span>${select('mentality', mentalityOptions)}</label><label><span>プレス</span>${select('pressing', pressingOptions)}</label><label><span>テンポ</span>${select('tempo', tempoOptions)}</label></div>`;
+}
+
+function renderMatchPlan(state) {
+  const plan = state.matchPlan;
+  return `<article class="card match-plan-card"><div class="card__header"><div><h3>試合プランと自動交代</h3><p>手動試合と自動進行の両方で使用します</p></div><span class="position-tag">MATCH PLAN</span></div><div class="card__body">
+    <div class="match-plan-grid">
+      ${matchPlanNumberControl('substitutionMinute', '交代を始める時間', plan.substitutionMinute, 45, 80, '分')}
+      ${matchPlanNumberControl('fitnessThreshold', '疲労交代の体力基準', plan.fitnessThreshold, 40, 85, '%')}
+      ${matchPlanNumberControl('maxSubstitutions', '自動交代の上限', plan.maxSubstitutions, 0, 5, '人')}
+      <label class="match-plan-switch"><input type="checkbox" data-match-plan-key="automaticSubstitutions" ${plan.automaticSubstitutions ? 'checked' : ''}><span><strong>自動交代を使う</strong><small>負傷、警告、疲労、低評価の順に判断</small></span></label>
+      <label class="match-plan-switch"><input type="checkbox" data-match-plan-key="prioritizeYouth" ${plan.prioritizeYouth ? 'checked' : ''}><span><strong>若手を優先</strong><small>同程度なら23歳以下を投入</small></span></label>
+      <label class="match-plan-switch"><input type="checkbox" data-match-plan-key="preserveKeyPlayers" ${plan.preserveKeyPlayers ? 'checked' : ''}><span><strong>主力を温存</strong><small>リード時は疲労した中心選手を早めに交代</small></span></label>
+      <label class="match-plan-switch"><input type="checkbox" data-match-plan-key="protectBooked" ${plan.protectBooked ? 'checked' : ''}><span><strong>警告選手を保護</strong><small>2枚目の警告リスクを交代順位へ反映</small></span></label>
+      <label class="match-plan-switch"><input type="checkbox" data-match-plan-key="stopImportantMatches" ${plan.stopImportantMatches ? 'checked' : ''}><span><strong>重要試合は手動</strong><small>全国王者杯の準決勝・決勝で自動進行を停止</small></span></label>
+    </div>
+    <div class="score-reaction-grid"><h4>スコア状況ごとの指示</h4>${matchPlanReaction('leading', 'リード時', plan)}${matchPlanReaction('drawing', '同点時', plan)}${matchPlanReaction('trailing', 'ビハインド時', plan)}</div>
+  </div></article>`;
+}
+
 function renderTactics(state) {
   const players = userPlayers(state);
   const metrics = overallSquadMetrics(state);
@@ -323,7 +369,8 @@ function renderTactics(state) {
       <article class="card"><div class="card__header"><div><h3>週間トレーニング</h3><p>次の試合週に効果を適用</p></div></div><div class="card__body"><div class="training-options">
         ${Object.entries(TRAINING_FOCUSES).map(([id, focus]) => `<label class="training-option"><input type="radio" name="trainingFocus" value="${id}" data-training-focus ${state.trainingFocus === id ? 'checked' : ''}><span class="training-option__body"><span class="training-option__icon">${icon(id === 'recovery' ? 'pulse' : id === 'youth' ? 'academy' : 'tactics', 17)}</span><span><strong>${escapeHtml(focus.label)}</strong><small>${escapeHtml(focus.description)}</small></span><span class="training-option__check"></span></span></label>`).join('')}
       </div></div></article>
-    </section>`;
+    </section>
+    <section style="margin-top:14px">${renderMatchPlan(state)}</section>`;
 }
 
 function standingsTable(state, division = userClub(state).division) {
@@ -558,6 +605,76 @@ function eventIcon(type) {
   if (type === 'substitution') return '⇄';
   if (type === 'half' || type === 'full') return '⏱';
   return '·';
+}
+
+function liveSelect(key, current, options) {
+  return `<label><span>${escapeHtml(TACTIC_LABELS[key]?.[0] ?? key)}</span><select class="control-select" data-live-tactic="${key}">${Object.entries(options).map(([value, label]) => `<option value="${value}" ${current === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label>`;
+}
+
+function liveMatchPitch(session) {
+  const home = session.sides.home;
+  const away = session.sides.away;
+  const renderSide = (side, sideName) => {
+    const players = new Map(side.players.map((player) => [player.id, player]));
+    return side.lineup.map((entry) => {
+      const player = players.get(entry.playerId);
+      const y = sideName === 'home' ? entry.y : 100 - entry.y;
+      const fitness = Math.round(session.liveFitness[entry.playerId] ?? player?.fitness ?? 0);
+      return `<span class="live-pitch-player live-pitch-player--${sideName}" style="left:${entry.x}%;top:${y}%" title="${escapeHtml(player?.name ?? '')} · 体力${fitness}"><b>${escapeHtml((player?.name ?? '–').replace(/\s/g, '').slice(-2))}</b><small>${fitness}</small></span>`;
+    }).join('');
+  };
+  return `<div class="live-pitch" aria-label="2D試合盤"><span class="live-pitch__half"></span><span class="live-pitch__circle"></span><span class="live-pitch__box live-pitch__box--top"></span><span class="live-pitch__box live-pitch__box--bottom"></span><span class="live-ball" style="left:${48 + (session.score.home - session.score.away) * 3}%;top:${session.minute < 45 ? 54 : 46}%">⚽</span>${renderSide(home, 'home')}${renderSide(away, 'away')}</div>`;
+}
+
+export function renderLiveMatchCenter(state, session) {
+  const home = session.sides.home.club;
+  const away = session.sides.away.club;
+  const user = session.sides[session.userSide];
+  const userPlayers = new Map(user.players.map((player) => [player.id, player]));
+  const possessionDuration = session.totals.duration || 1;
+  const homePossession = Math.round(session.totals.possessionWeighted.home / possessionDuration) || 50;
+  const awayPossession = 100 - homePossession;
+  const phases = [45, 60, 75, 90];
+  const nextMinute = phases[session.phaseIndex] ?? 90;
+  const recentEvents = session.events.slice(-12).reverse();
+  const lineupOptions = user.lineup
+    .map((entry) => {
+      const player = userPlayers.get(entry.playerId);
+      return `<option value="${entry.playerId}">${escapeHtml(player?.name ?? '不明')} · ${entry.slotPosition} · 体力${Math.round(session.liveFitness[entry.playerId] ?? 0)} · 評価${session.liveRatings[entry.playerId] ?? 6.5}</option>`;
+    }).join('');
+  const benchOptions = user.bench
+    .map((playerId) => userPlayers.get(playerId))
+    .filter(Boolean)
+    .map((player) => `<option value="${player.id}">${escapeHtml(player.name)} · ${player.position} · OVR ${player.overall} · 体力${Math.round(session.liveFitness[player.id] ?? player.fitness)}</option>`).join('');
+  const tactics = user.tactics;
+  const timeline = [
+    ['前半', 45], ['60分', 60], ['75分', 75], ['終了', 90]
+  ].map(([label, minute], index) => `<span class="live-phase ${session.phaseIndex > index ? 'is-complete' : session.phaseIndex === index ? 'is-current' : ''}"><b>${label}</b><small>${minute}'</small></span>`).join('');
+  const finished = session.completed;
+  return `<div class="modal-backdrop live-match-backdrop"><section class="live-match-center" data-live-match role="dialog" aria-modal="true" aria-label="ライブ試合センター">
+    <header class="live-match-header"><div class="live-match-header__meta"><span class="live-pill">${finished ? 'FULL TIME' : 'TACTICAL LIVE'}</span><span>${session.minute}' · 交代 ${user.substitutionsUsed}/5</span></div><div class="live-match-scoreboard"><div>${clubBadge(home, 'md')}<strong>${escapeHtml(home.name)}</strong></div><p><b>${session.score.home}</b><span>–</span><b>${session.score.away}</b><small>${finished ? '試合終了' : `${nextMinute}分まで進行`}</small></p><div>${clubBadge(away, 'md')}<strong>${escapeHtml(away.name)}</strong></div></div><div class="live-phase-track">${timeline}</div></header>
+    <div class="live-match-layout">
+      <main class="live-match-stage">
+        ${liveMatchPitch(session)}
+        <div class="live-match-stat-strip"><span><small>支配率</small><strong>${homePossession}% - ${awayPossession}%</strong></span><span><small>シュート</small><strong>${session.totals.homeShots} - ${session.totals.awayShots}</strong></span><span><small>xG</small><strong>${session.totals.homeXg.toFixed(2)} - ${session.totals.awayXg.toFixed(2)}</strong></span></div>
+        <section class="live-commentary"><div class="section-mini-header"><strong>試合の流れ</strong><span>最新の出来事</span></div>${recentEvents.length ? recentEvents.map((event) => `<div class="live-commentary__item live-commentary__item--${event.type}"><time>${event.minute}'</time><span>${eventIcon(event.type)}</span><p>${escapeHtml(event.text)}</p></div>`).join('') : '<p class="muted">キックオフを待っています。</p>'}</section>
+      </main>
+      <aside class="live-command-panel">
+        <div class="live-command-panel__title"><span class="eyebrow">MANAGER COMMAND</span><h3>${finished ? '試合結果' : '次の区間への指示'}</h3><p>${finished ? '結果を確定してクラブへ戻ります。' : '変更は次の区間だけに反映されます。'}</p></div>
+        ${finished ? `<div class="live-final-summary"><strong>${session.score[session.userSide]}得点</strong><span>交代${user.substitutionsUsed}人 · 警告${session.totals[session.userSide === 'home' ? 'homeCards' : 'awayCards']}枚</span></div>` : `<div class="live-tactics-grid">
+          ${liveSelect('formation', tactics.formation, Object.fromEntries(Object.keys(FORMATIONS).map((value) => [value, value])))}
+          ${liveSelect('mentality', tactics.mentality, TACTIC_LABELS.mentality[1])}
+          ${liveSelect('pressing', tactics.pressing, TACTIC_LABELS.pressing[1])}
+          ${liveSelect('tempo', tactics.tempo, TACTIC_LABELS.tempo[1])}
+          ${liveSelect('passing', tactics.passing, TACTIC_LABELS.passing[1])}
+          ${liveSelect('defensiveLine', tactics.defensiveLine, TACTIC_LABELS.defensiveLine[1])}
+          ${liveSelect('focus', tactics.focus, TACTIC_LABELS.focus[1])}
+          ${liveSelect('width', tactics.width, TACTIC_LABELS.width[1])}
+        </div><div class="live-substitution"><div class="section-mini-header"><strong>手動交代</strong><span>残り ${Math.max(0, 5 - user.substitutionsUsed)}人</span></div><label><span>OUT</span><select class="control-select" data-live-player-out><option value="">交代する選手</option>${lineupOptions}</select></label><label><span>IN</span><select class="control-select" data-live-player-in><option value="">投入する選手</option>${benchOptions}</select></label><button class="btn btn--secondary btn--wide" type="button" data-command="live-substitute" ${!benchOptions || user.substitutionsUsed >= 5 ? 'disabled' : ''}>選手交代を実行</button></div>`}
+      </aside>
+    </div>
+    <footer class="live-match-actions">${finished ? `<button class="btn btn--primary" type="button" data-command="live-finish">結果を確定して戻る</button>` : `<button class="btn btn--ghost" type="button" data-command="live-skip">残りを自動で進める</button><button class="btn btn--primary" type="button" data-command="live-advance">${nextMinute}分まで進める ${icon('play', 17)}</button>`}</footer>
+  </section></div>`;
 }
 
 export function renderMatchModal(state, report, replay = false) {
