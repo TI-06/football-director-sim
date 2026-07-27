@@ -17,10 +17,10 @@ jobs:
       - name: Package repository
         shell: bash
         run: |
-          tar --exclude=.git --exclude=.github/workflows/export-latest-source.yml -czf football-director-latest.tgz .
+          tar --exclude=.git --exclude=.github/workflows/export-latest-source.yml -czf /tmp/football-director-latest.tgz .
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
           name: football-director-latest-source
-          path: football-director-latest.tgz
+          path: /tmp/football-director-latest.tgz
           retention-days: 1
