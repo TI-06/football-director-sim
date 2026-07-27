@@ -1,0 +1,26 @@
+name: Export live match source
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request branch
+        uses: actions/checkout@v4
+      - name: Package repository
+        shell: bash
+        run: |
+          tar --exclude=.git --exclude=.github/workflows/export-live-match-source.yml --exclude=EXPORT_LIVE_MATCH_TRIGGER -czf /tmp/football-director-live-match.tgz .
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-director-live-match-source
+          path: /tmp/football-director-live-match.tgz
+          retention-days: 1
