@@ -1,4 +1,5 @@
 import { clamp } from '../core/utils.js';
+import { JAPANESE_CLUB_TEMPLATES, JAPANESE_FIRST_NAMES, JAPANESE_LAST_NAMES, createOriginalClub } from './japan-pyramid.js';
 
 export const DIFFICULTIES = {
   casual: { id: 'casual', label: 'カジュアル', budgetMultiplier: 1.3, opponentBoost: -2, boardTolerance: 12 },
@@ -6,16 +7,7 @@ export const DIFFICULTIES = {
   hard: { id: 'hard', label: 'ハード', budgetMultiplier: 0.78, opponentBoost: 3, boardTolerance: -10 }
 };
 
-export const CLUB_TEMPLATES = [
-  { id: 'northbridge-fc', name: 'Northbridge FC', shortName: 'NBR', city: 'ノースブリッジ', primary: '#10b981', secondary: '#052e2b', reputation: 68, style: 'balanced', stadium: 'Crown Park', capacity: 24200 },
-  { id: 'redhaven-athletic', name: 'Redhaven Athletic', shortName: 'RHA', city: 'レッドヘイブン', primary: '#ef4444', secondary: '#3f0d12', reputation: 75, style: 'pressing', stadium: 'Forge Arena', capacity: 31000 },
-  { id: 'azure-city', name: 'Azure City', shortName: 'AZC', city: 'アジュール', primary: '#38bdf8', secondary: '#082f49', reputation: 78, style: 'possession', stadium: 'Oceanic Bowl', capacity: 35400 },
-  { id: 'ironvale-united', name: 'Ironvale United', shortName: 'IVU', city: 'アイアンベイル', primary: '#94a3b8', secondary: '#1e293b', reputation: 70, style: 'direct', stadium: 'Foundry Ground', capacity: 27500 },
-  { id: 'goldcrest-rovers', name: 'Goldcrest Rovers', shortName: 'GCR', city: 'ゴールドクレスト', primary: '#f59e0b', secondary: '#451a03', reputation: 65, style: 'counter', stadium: 'Sunfield', capacity: 21800 },
-  { id: 'violet-orbit', name: 'Violet Orbit', shortName: 'VOR', city: 'ヴァイオレット', primary: '#a78bfa', secondary: '#2e1065', reputation: 72, style: 'technical', stadium: 'Orbit Dome', capacity: 29200 },
-  { id: 'forest-guardians', name: 'Forest Guardians', shortName: 'FGD', city: 'グリーンウッド', primary: '#22c55e', secondary: '#052e16', reputation: 63, style: 'youth', stadium: 'Canopy Field', capacity: 19600 },
-  { id: 'silverport-1899', name: 'Silverport 1899', shortName: 'S99', city: 'シルバーポート', primary: '#e2e8f0', secondary: '#334155', reputation: 80, style: 'elite', stadium: 'Harbour National', capacity: 40100 }
-];
+export const CLUB_TEMPLATES = JAPANESE_CLUB_TEMPLATES;
 
 export const FORMATIONS = {
   '4-2-3-1': {
@@ -65,8 +57,8 @@ export const DEFAULT_TACTICS = {
   familiarity: 72
 };
 
-const FIRST_NAMES = ['Ren', 'Haru', 'Sora', 'Kai', 'Leo', 'Noah', 'Luca', 'Theo', 'Mateo', 'Eli', 'Jun', 'Riku', 'Yuto', 'Kota', 'Finn', 'Milo', 'Ari', 'Nico', 'Iker', 'Toma', 'Rayan', 'Dario', 'Enzo', 'Owen', 'Rui', 'Kenji', 'Akira', 'Shin', 'Marco', 'Luis'];
-const LAST_NAMES = ['Aoki', 'Mercer', 'Santos', 'Ishida', 'Bennett', 'Keller', 'Costa', 'Morita', 'Vega', 'Foster', 'Silva', 'Kobayashi', 'Ortega', 'Mori', 'Walsh', 'Conti', 'Nakamura', 'Reed', 'Alvarez', 'Tanaka', 'Rossi', 'Cole', 'Park', 'Navarro', 'Sato', 'Hughes', 'Kim', 'Moretti', 'Ito', 'Blake'];
+const FIRST_NAMES = JAPANESE_FIRST_NAMES;
+const LAST_NAMES = JAPANESE_LAST_NAMES;
 const POSITION_PLAN = ['GK', 'GK', 'RB', 'LB', 'CB', 'CB', 'CB', 'CB', 'DM', 'DM', 'CM', 'CM', 'CM', 'AM', 'AM', 'RW', 'LW', 'RM', 'LM', 'ST', 'ST', 'ST'];
 
 const SECONDARY = {
@@ -108,7 +100,7 @@ function createPlayer(rng, clubId, position, index, baseOverall, prefix = 'p') {
   const age = rng.int(position === 'GK' ? 20 : 18, position === 'GK' ? 35 : 33);
   const overall = clamp(baseOverall + rng.int(-7, 7), 48, 88);
   const potential = clamp(overall + rng.int(age <= 21 ? 5 : 0, age <= 23 ? 14 : 6), overall, 93);
-  const name = `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
+  const name = `${rng.pick(LAST_NAMES)} ${rng.pick(FIRST_NAMES)}`;
   const value = Math.round((overall ** 3) * (potential / 70) * Math.max(0.55, (35 - age) / 16) * 950);
   const wage = Math.round((overall ** 2) * 105 + rng.int(0, 180_000));
   return {
@@ -137,13 +129,23 @@ function createPlayer(rng, clubId, position, index, baseOverall, prefix = 'p') {
     assists: 0,
     cleanSheets: 0,
     seasonRating: 0,
+    starts: 0,
+    minutes: 0,
+    manOfTheMatch: 0,
+    careerStats: { appearances: 0, starts: 0, minutes: 0, goals: 0, assists: 0, cleanSheets: 0, manOfTheMatch: 0 },
+    seasonHistory: [],
+    happiness: rng.int(62, 84),
+    concerns: [],
+    transferRequest: false,
+    retirementAnnounced: false,
     scouting: 100
   };
 }
 
-export function generateLeague(rng, difficulty = 'normal', userClubId = 'northbridge-fc') {
+export function generateLeague(rng, difficulty = 'normal', userClubId = CLUB_TEMPLATES[0].id, customClub = null) {
   const difficultyConfig = DIFFICULTIES[difficulty] ?? DIFFICULTIES.normal;
-  const clubs = CLUB_TEMPLATES.map((template, index) => {
+  const templates = customClub ? [...CLUB_TEMPLATES.filter((club) => club.division !== 3 || club.id !== CLUB_TEMPLATES.filter((item) => item.division === 3).at(-1).id), createOriginalClub(customClub)] : CLUB_TEMPLATES;
+  const clubs = templates.map((template, index) => {
     const baseCash = 760_000_000 + template.reputation * 6_500_000;
     return {
       ...template,
@@ -158,8 +160,11 @@ export function generateLeague(rng, difficulty = 'normal', userClubId = 'northbr
         scouting: clamp(1 + Math.floor((template.reputation - 60) / 12), 1, 5),
         stadium: clamp(1 + Math.floor(template.capacity / 10_000), 1, 5)
       },
-      objective: index < 2 ? '優勝争い' : index < 5 ? '上位4位' : '残留',
-      sponsorWeekly: 7_500_000 + template.reputation * 90_000,
+      reserveCash: Math.round(baseCash * 0.28),
+      saleRetention: template.division === 1 ? 0.78 : template.division === 2 ? 0.85 : 0.9,
+      projects: { medical: 0, analytics: 0, commercial: 0, community: 0, expansion: 0 },
+      objective: template.division === 1 ? (index % 20 < 5 ? '優勝争い' : index % 20 < 12 ? '上位10位' : '残留') : template.division === 2 ? (index % 20 < 6 ? '昇格争い' : '中位以上') : (index % 20 < 6 ? '昇格争い' : '基盤づくり'),
+      sponsorWeekly: (template.division === 1 ? 7_500_000 : template.division === 2 ? 4_000_000 : 2_000_000) + template.reputation * 65_000,
       ticketPrice: 3200 + Math.round(template.reputation * 18),
       trainingFocus: 'balanced',
       tactics: { ...DEFAULT_TACTICS, formation: template.style === 'direct' ? '4-4-2' : template.style === 'counter' ? '5-3-2' : template.style === 'pressing' ? '4-3-3' : '4-2-3-1' }
