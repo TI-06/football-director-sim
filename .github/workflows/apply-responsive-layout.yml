@@ -6,12 +6,14 @@ on:
       - main
     paths:
       - .responsive-transfer/responsive.part*
+      - .responsive-transfer/mobile-row-fix.patch
       - .github/workflows/apply-responsive-layout.yml
   push:
     branches:
       - feature/responsive-layout-audit
     paths:
       - .responsive-transfer/responsive.part*
+      - .responsive-transfer/mobile-row-fix.patch
       - .github/workflows/apply-responsive-layout.yml
 
 permissions:
@@ -56,12 +58,16 @@ jobs:
           gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
           test "$(wc -c < /tmp/responsive-layout.patch)" -eq 42664
           echo "1af2760a6ad1a3cf3cf8f09dfa4e23232b31da4a060680a4e7b89e39ec69cfaa  /tmp/responsive-layout.patch" | sha256sum -c -
-      - name: Check and apply reviewed patch
+          test "$(wc -c < .responsive-transfer/mobile-row-fix.patch)" -eq 2493
+          echo "b8bf473c4bb9ad4896b9a99bceae8e06d3362b66793eb0327fef4b3f8215eb39  .responsive-transfer/mobile-row-fix.patch" | sha256sum -c -
+      - name: Check and apply reviewed patches
         shell: bash
         run: |
           set -euo pipefail
           git apply --check --whitespace=error /tmp/responsive-layout.patch
           git apply --index --whitespace=error /tmp/responsive-layout.patch
+          git apply --check --whitespace=error .responsive-transfer/mobile-row-fix.patch
+          git apply --index --whitespace=error .responsive-transfer/mobile-row-fix.patch
           rm -rf .responsive-transfer
           rm -f .github/workflows/apply-responsive-layout.yml
           git add -A
