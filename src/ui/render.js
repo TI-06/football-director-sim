@@ -244,6 +244,12 @@ function renderDashboard(state, uiState = {}) {
       ${metricCard('取締役会の信頼', `${club.boardConfidence}%`, club.objective, 'pulse', club.boardConfidence < 45 ? 'danger' : '')}
       ${metricCard('チーム状態', `${metrics.morale} / ${metrics.fitness}`, `士気 / 体力 · 負傷 ${metrics.injuries}人`, 'squad', metrics.injuries >= 3 ? 'warning' : '')}
     </section>
+    <section class="dashboard-quick-actions" aria-label="クイック操作">
+      <button type="button" data-nav="squad">${icon('squad', 20)}<span><strong>先発を確認</strong><small>配置・体力・役割</small></span></button>
+      <button type="button" data-nav="tactics">${icon('tactics', 20)}<span><strong>試合プラン</strong><small>戦術と交代条件</small></span></button>
+      <button type="button" data-nav="secretary">${icon('star', 20)}<span><strong>秘書レポート</strong><small>今週の要注意事項</small></span></button>
+      <button type="button" data-nav="inbox">${icon('inbox', 20)}<span><strong>受信トレイ</strong><small>未処理 ${unresolved.length}件</small></span></button>
+    </section>
     <section class="grid-2" style="margin-top:14px">
       ${matchCard}
       <article class="card"><div class="card__header"><div><h3>順位表</h3><p>上位6クラブ</p></div><button class="btn btn--ghost btn--sm" type="button" data-nav="schedule">全体を見る</button></div><div class="card__body"><table class="mini-table"><thead><tr><th>#</th><th>クラブ</th><th>試</th><th>差</th><th>勝点</th></tr></thead><tbody>${miniRows}</tbody></table></div></article>
@@ -251,12 +257,6 @@ function renderDashboard(state, uiState = {}) {
     <section class="grid-equal" style="margin-top:14px">
       <article class="card"><div class="card__header"><div><h3>優先受信トレイ</h3><p>未処理の判断事項</p></div><button class="btn btn--ghost btn--sm" type="button" data-nav="inbox">すべて見る</button></div><div class="card__body">${unresolved.length ? `<div class="alert-list">${unresolved.map((item) => `<div class="alert-item"><span class="alert-item__icon">${icon('inbox', 16)}</span><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.category)} · WEEK ${item.week}</span></div><button type="button" data-nav="inbox">${icon('chevron', 16)}</button></div>`).join('')}</div>` : emptyState('未処理事項はありません', '次の試合へ進むと新しい連絡が届くことがあります。')}</div></article>
       <article class="card"><div class="card__header"><div><h3>スカッドアラート</h3><p>起用前に確認したい状態</p></div><button class="btn btn--ghost btn--sm" type="button" data-nav="squad">スカッドへ</button></div><div class="card__body">${alerts.length ? `<div class="alert-list">${alerts.map((item) => `<div class="alert-item"><span class="alert-item__icon">${icon('warning', 16)}</span><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.detail)}</span></div><button type="button" data-nav="${item.view}">${icon('chevron', 16)}</button></div>`).join('')}</div>` : emptyState('大きな問題はありません', '先発候補のコンディションは整っています。', 'squad')}</div></article>
-    </section>
-    <section class="dashboard-quick-actions" aria-label="クイック操作">
-      <button type="button" data-nav="squad">${icon('squad', 20)}<span><strong>先発を確認</strong><small>配置・体力・役割</small></span></button>
-      <button type="button" data-nav="tactics">${icon('tactics', 20)}<span><strong>試合プラン</strong><small>戦術と交代条件</small></span></button>
-      <button type="button" data-nav="secretary">${icon('star', 20)}<span><strong>秘書レポート</strong><small>今週の要注意事項</small></span></button>
-      <button type="button" data-nav="inbox">${icon('inbox', 20)}<span><strong>受信トレイ</strong><small>未処理 ${unresolved.length}件</small></span></button>
     </section>
     <div class="mobile-continue-bar"><div><small>${fixture ? `${escapeHtml(fixture.competitionName ?? club.divisionName)} · WEEK ${fixture.week}` : `SEASON ${state.season}`}</small><strong>${fixture ? '次の試合を指揮する' : '次シーズンへ進む'}</strong></div><button class="btn btn--primary" type="button" data-command="${state.seasonStatus === 'active' ? 'play-week' : 'start-next-season'}" ${uiState.autoAdvanceActive ? 'disabled' : ''}>${icon(state.seasonStatus === 'active' ? 'play' : 'trophy', 18)} 進む</button></div>
   </div>`;
@@ -280,7 +280,9 @@ function lineupPitch(state) {
         const candidates = players
           .filter((player) => player.injuryWeeks <= 0 && !player.suspended)
           .sort((a, b) => playerSlotScore(b, entry.slotPosition) - playerSlotScore(a, entry.slotPosition));
-        return `<div class="pitch-slot" style="left:${entry.x}%;top:${entry.y}%" data-drop-slot="${entry.slotId}" data-slot-position="${entry.slotPosition}"><div class="pitch-player" draggable="true" data-drag-player="${selected?.id ?? ''}" data-source-slot="${entry.slotId}" tabindex="0" aria-label="${escapeHtml(selected?.name ?? '未設定')}をドラッグ"><div class="pitch-player__top"><span class="pitch-player__pos">${entry.slotPosition}</span><span class="pitch-player__roles">${roleBadges(state, entry.playerId)}</span><span class="pitch-player__rating">${selected?.overall ?? '–'}</span></div><strong class="pitch-player__name">${escapeHtml(selected?.name ?? '未設定')}</strong><select class="pitch-player__select" aria-label="${entry.slotPosition}の選手" data-lineup-slot="${entry.slotId}">${candidates.map((player) => `<option value="${player.id}" ${player.id === entry.playerId ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select></div></div>`;
+        const mobileX = Math.max(8, Math.min(92, 50 + ((entry.x - 50) * 1.2)));
+        const mobileY = entry.y >= 84 ? 91 : entry.y >= 60 ? 71 : entry.y >= 42 ? 50 : entry.y >= 23 ? 30 : 9;
+        return `<div class="pitch-slot" style="left:${entry.x}%;top:${entry.y}%;--slot-mobile-x:${mobileX.toFixed(1)}%;--slot-mobile-y:${mobileY.toFixed(1)}%" data-drop-slot="${entry.slotId}" data-slot-position="${entry.slotPosition}"><div class="pitch-player" draggable="true" data-drag-player="${selected?.id ?? ''}" data-source-slot="${entry.slotId}" tabindex="0" aria-label="${escapeHtml(selected?.name ?? '未設定')}をドラッグ"><div class="pitch-player__top"><span class="pitch-player__pos">${entry.slotPosition}</span><span class="pitch-player__roles">${roleBadges(state, entry.playerId)}</span><span class="pitch-player__rating">${selected?.overall ?? '–'}</span></div><strong class="pitch-player__name">${escapeHtml(selected?.name ?? '未設定')}</strong><select class="pitch-player__select" aria-label="${entry.slotPosition}の選手" data-lineup-slot="${entry.slotId}">${candidates.map((player) => `<option value="${player.id}" ${player.id === entry.playerId ? 'selected' : ''}>${escapeHtml(player.name)}</option>`).join('')}</select></div></div>`;
       }).join('')}
     </div></div>
     <div class="role-summary"><div class="role-summary__item"><span class="role-badge role-badge--captain">C</span><span>キャプテン<strong>${escapeHtml(captain?.name ?? '未設定')}</strong><small>${captain ? `${captain.position} · OVR ${captain.overall}` : '先発から選択'}</small></span></div><div class="role-summary__item"><span class="role-badge role-badge--penalty">PK</span><span>PKキッカー<strong>${escapeHtml(penaltyTaker?.name ?? '未設定')}</strong><small>${penaltyTaker ? `${penaltyTaker.position} · OVR ${penaltyTaker.overall}` : '先発から選択'}</small></span></div><div class="role-summary__item"><span class="role-summary__count">${state.lineup.bench.length}</span><span>控え登録<strong>${state.lineup.bench.length}名</strong><small>表からドラッグ可能</small></span></div></div>

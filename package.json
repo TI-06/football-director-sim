@@ -11,9 +11,14 @@
     "smoke": "node scripts/smoke-server.mjs",
     "verify": "npm test && npm run check && npm run smoke",
     "build": "node scripts/build.mjs",
-    "deploy": "npm run build && npx wrangler pages deploy dist --project-name football-director-sim"
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name football-director-sim",
+    "test:responsive": "playwright test",
+    "test:responsive:update": "playwright test --update-snapshots"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
   }
 }

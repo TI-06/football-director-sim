@@ -59,12 +59,37 @@ test('auto advance stops for unresolved club operations and derby matches', () =
   assert.equal(importantFixtureReason(state), 'ダービーマッチ');
 });
 
-test('responsive shell hides the context rail and prevents horizontal overflow on mobile', () => {
+test('responsive shell uses compact desktop geometry and four stable breakpoints', () => {
   const css = fs.readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
-  assert.match(css, /grid-template-columns:\s*238px\s+minmax\(0,\s*1fr\)\s+300px/);
-  assert.match(css, /@media \(max-width: 1120px\)[\s\S]*?\.context-panel\s*\{[^}]*display:\s*none/);
+  assert.match(css, /grid-template-columns:\s*216px\s+minmax\(0,\s*1fr\)\s+264px/);
+  assert.match(css, /\.topbar\s*\{[^}]*height:\s*64px/);
+  assert.match(css, /@media \(max-width: 1279px\)[\s\S]*?\.context-panel\s*\{[^}]*display:\s*none/);
+  assert.match(css, /@media \(max-width: 1120px\)[\s\S]*?\.app-shell[^}]*grid-template-columns:\s*82px\s+minmax\(0,\s*1fr\)/);
   assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.app-shell\s*\{[^}]*display:\s*block/);
   assert.match(css, /body\s*\{[^}]*overflow-x:\s*hidden/);
+});
+
+test('mobile layout fixes navigation to five columns and keeps cards within the page', () => {
+  const css = fs.readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.mobile-nav\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.mobile-nav\s*\{[^}]*overflow-x:\s*hidden/);
+  assert.ok(css.lastIndexOf('.metrics-grid { grid-template-columns: 1fr;') > css.lastIndexOf('.metrics-grid { display: flex;'));
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.card\s*\{[^}]*min-width:\s*0/);
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.squad-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+});
+
+
+test('dashboard places quick actions before the match workspace', () => {
+  const state = createNewGame({ seed: 'dashboard-priority', clubId: 'jp1-01' });
+  const html = renderApplication(state, 'dashboard');
+  assert.ok(html.indexOf('dashboard-quick-actions') < html.indexOf('next-match'));
+});
+
+test('mobile primary controls expose forty-four pixel touch targets', () => {
+  const css = fs.readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.btn,\s*\.btn--sm\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.alert-item button\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/);
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.actions--management \.btn\s*\{[^}]*min-width:\s*44px/);
 });
 
 test('regional scouting buttons select a candidate compatible with each region', () => {
@@ -77,4 +102,25 @@ test('regional scouting buttons select a candidate compatible with each region',
 
   assert.match(html, new RegExp(`data-player-id="${unassignedPlayer.id}" data-region="北海道・東北"`));
   assert.match(html, new RegExp(`data-player-id="${kantoPlayer.id}" data-region="関東"`));
+});
+
+test('responsive browser audit defines seven Playwright projects', () => {
+  const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(packageJson.scripts['test:responsive'], 'playwright test');
+  assert.equal(packageJson.scripts['test:responsive:update'], 'playwright test --update-snapshots');
+  const config = fs.readFileSync(new URL('../playwright.config.mjs', import.meta.url), 'utf8');
+  for (const project of ['desktop-large', 'desktop', 'desktop-small', 'tablet', 'mobile', 'mobile-small', 'mobile-min']) {
+    assert.match(config, new RegExp(`name: '${project}'`));
+  }
+});
+
+test('mobile pitch spreads lineup cards with dedicated coordinates', () => {
+  const state = createNewGame({ seed: 'mobile-pitch-spacing', clubId: 'jp1-01' });
+  const html = renderApplication(state, 'squad');
+  const css = fs.readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
+  assert.match(html, /--slot-mobile-x:\s*[\d.]+%/);
+  assert.match(html, /--slot-mobile-y:\s*[\d.]+%/);
+  assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.pitch-slot\s*\{[^}]*left:\s*var\(--slot-mobile-x\)[^}]*top:\s*var\(--slot-mobile-y\)[^}]*width:\s*clamp\(48px,\s*15vw,\s*54px\)/);
+  const mobileRows = [...html.matchAll(/--slot-mobile-y:([\d.]+)%/g)].map((match) => Number(match[1]));
+  assert.deepEqual([...new Set(mobileRows)].sort((a, b) => a - b), [9, 30, 50, 71, 91]);
 });
