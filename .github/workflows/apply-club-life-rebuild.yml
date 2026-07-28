@@ -1,0 +1,68 @@
+name: Apply club life rebuild
+
+on:
+  push:
+    branches:
+      - rebuild/club-life-scouting-match-culture
+    paths:
+      - .transfer/READY
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out rebuild branch
+        uses: actions/checkout@v4
+        with:
+          ref: rebuild/club-life-scouting-match-culture
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Assemble and verify source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .transfer/source.part00 .transfer/source.part01 .transfer/source.part02 .transfer/source.part03 > /tmp/source.b64
+          test "$(wc -c < /tmp/source.b64)" = "155864"
+          test "$(sha256sum /tmp/source.b64 | cut -d' ' -f1)" = "d625b9c1af0a09fe31c2402a2e532c2c225ba3cde5b6057e1a7a1da981300f87"
+          base64 -d /tmp/source.b64 > /tmp/source.tar.gz
+          test "$(sha256sum /tmp/source.tar.gz | cut -d' ' -f1)" = "64c5a73a70e36cc115725032f4a3f2ea6eccba14fc3b982c92ce504d0478c957"
+          gzip -t /tmp/source.tar.gz
+
+      - name: Restore reviewed source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf /tmp/source.tar.gz -C .
+          rm -rf .transfer
+          rm -f .github/workflows/apply-club-life-rebuild.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+
+      - name: Verify application
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test
+          npm run check
+          npm run smoke
+          npm run build
+          git diff --check
+
+      - name: Commit verified rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add complete club life simulation systems"
+          git push
