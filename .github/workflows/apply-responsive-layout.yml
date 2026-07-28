@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - .responsive-transfer/responsive-layout.patch.gz.b64
+      - .responsive-transfer/responsive.part*
       - .github/workflows/apply-responsive-layout.yml
   push:
     branches:
       - feature/responsive-layout-audit
     paths:
-      - .responsive-transfer/responsive-layout.patch.gz.b64
+      - .responsive-transfer/responsive.part*
       - .github/workflows/apply-responsive-layout.yml
 
 permissions:
@@ -33,27 +33,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Inspect patch payload
+      - name: Verify and assemble patch chunks
         shell: bash
         run: |
           set -euo pipefail
-          cp .responsive-transfer/responsive-layout.patch.gz.b64 /tmp/responsive-layout.patch.gz.b64
-          {
-            wc -c /tmp/responsive-layout.patch.gz.b64
-            sha256sum /tmp/responsive-layout.patch.gz.b64
-            base64 --decode /tmp/responsive-layout.patch.gz.b64 > /tmp/responsive-layout.patch.gz
-            sha256sum /tmp/responsive-layout.patch.gz
-            gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
-            wc -c /tmp/responsive-layout.patch
-            sha256sum /tmp/responsive-layout.patch
-          } | tee responsive-patch-diagnostics.txt
-      - name: Verify patch payload
-        shell: bash
-        run: |
-          set -euo pipefail
+          test "$(wc -c < .responsive-transfer/responsive.part00)" -eq 4195
+          test "$(wc -c < .responsive-transfer/responsive.part01)" -eq 4195
+          test "$(wc -c < .responsive-transfer/responsive.part02)" -eq 4195
+          test "$(wc -c < .responsive-transfer/responsive.part03)" -eq 4195
+          echo "6318a6b4fd819cb59d2b2e8ba680ffc6cb25fa619cd27a6ae8c6de835a71e338  .responsive-transfer/responsive.part00" | sha256sum -c -
+          echo "555291599585d8b7df9d314d70a723537a6adf19696d0a5d79433af2517b8d77  .responsive-transfer/responsive.part01" | sha256sum -c -
+          echo "016092d9cddb274bc39b7487f670cf8ca05933c0280c193eab9e7788212fe20c  .responsive-transfer/responsive.part02" | sha256sum -c -
+          echo "7eab7060f908d53b71aed48ab54d438c4cb5a3729b035470808654a6d3ef7e60  .responsive-transfer/responsive.part03" | sha256sum -c -
+          cat .responsive-transfer/responsive.part00 \
+              .responsive-transfer/responsive.part01 \
+              .responsive-transfer/responsive.part02 \
+              .responsive-transfer/responsive.part03 > /tmp/responsive-layout.patch.gz.b64
           test "$(wc -c < /tmp/responsive-layout.patch.gz.b64)" -eq 16780
           echo "f37baad3b0d640db08da59052dd049ab1692885e42569a5b6489f1ad91247451  /tmp/responsive-layout.patch.gz.b64" | sha256sum -c -
+          base64 --decode /tmp/responsive-layout.patch.gz.b64 > /tmp/responsive-layout.patch.gz
           echo "aaded2406cc2af422017c6447b8230ad03134ba2c149c07688e37d954dd576ab  /tmp/responsive-layout.patch.gz" | sha256sum -c -
+          gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
+          test "$(wc -c < /tmp/responsive-layout.patch)" -eq 42664
           echo "1af2760a6ad1a3cf3cf8f09dfa4e23232b31da4a060680a4e7b89e39ec69cfaa  /tmp/responsive-layout.patch" | sha256sum -c -
       - name: Check and apply reviewed patch
         shell: bash
@@ -85,7 +86,6 @@ jobs:
         with:
           name: responsive-apply-evidence
           path: |
-            responsive-patch-diagnostics.txt
             playwright-report
             test-results
             responsive-screenshots
