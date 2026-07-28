@@ -1,0 +1,66 @@
+expected_chunk00a=8d2edfec7e96d428d112f788f2b95f5d5e0931852f5162be36501ed8c592c0b6
+expected_chunk00b=a99f45f9bc5508e1f91adafded0733ac9c99d9ae10f5feaec5b17ed1ee996f68
+expected_chunk06a=8e6603c2757916a7d1b07cf1da5ea70a706247413d2ce33fd4c9742748096069
+8d2edfec7e96d428d112f788f2b95f5d5e0931852f5162be36501ed8c592c0b6  /tmp/chunk00a
+7fa7dd9ccfc955de637751106826c7053d6d36c9a3d61a280c86e322f1f8be4a  /tmp/chunk00b
+42cbd497fc7f959b0e6d1392fbd1a19a5ab6ac484a65f5e6eb44ef3cc064186d  /tmp/chunk06a
+base64_bytes=109240
+decode_status=0
+actual_sha256=a874491fe7acee7ecd5fe28be75d5da9d364d680de59678453784ed99931ecee
+expected_sha256=c1af393010663b43f138a4ab683ea4c0c819b0dffa58968b92a481f86bb1190c
+Archive:  /tmp/football-director-source.zip
+    testing: tests/                   OK
+    testing: tests/management.test.js   OK
+    testing: tests/random.test.js     OK
+    testing: tests/match-engine.test.js   OK
+    testing: tests/build.test.js      OK
+    testing: tests/game-engine.test.js   OK
+    testing: tests/fixtures.test.js   OK
+    testing: tests/squad.test.js      OK
+    testing: tests/ui.test.js         OK
+    testing: assets/                  OK
+    testing: assets/favicon.svg       OK
+    testing: wrangler.toml            OK
+    testing: _headers                 bad CRC 9bb0139d  (should be 01735023)
+    testing: docs/                    OK
+    testing: docs/code-review.md      OK
+    testing: docs/test-report.md      OK
+    testing: docs/superpowers/        OK
+    testing: docs/superpowers/plans/   OK
+    testing: docs/superpowers/plans/2026-07-26-football-director-simulation-plan.md   OK
+    testing: docs/superpowers/specs/   OK
+    testing: docs/superpowers/specs/2026-07-26-football-director-simulation-design.md   OK
+    testing: .gitignore               OK
+    testing: README.md                OK
+    testing: .node-version            OK
+    testing: package.json             OK
+    testing: index.html               OK
+    testing: src/                     OK
+    testing: src/core/                OK
+    testing: src/core/utils.js        OK
+    testing: src/core/random.js       OK
+    testing: src/styles.css           OK
+    testing: src/ui/                  OK
+    testing: src/ui/templates.js      OK
+    testing: src/ui/controller.js     OK
+    testing: src/ui/render.js         OK
+    testing: src/data/                OK
+    testing: src/data/catalog.js      OK
+    testing: src/game/                OK
+    testing: src/game/transfers.js    OK
+    testing: src/game/development.js   OK
+    testing: src/game/game-engine.js   bad CRC f8c3233d  (should be f82cab3d)
+    testing: src/game/squad.js        OK
+    testing: src/game/fixtures.js     OK
+    testing: src/game/save.js         OK
+    testing: src/game/economy.js      OK
+    testing: src/game/match-engine.js   OK
+    testing: src/game/events.js       OK
+    testing: src/main.js              OK
+    testing: scripts/                 OK
+    testing: scripts/build.mjs        OK
+    testing: scripts/dev-server.mjs   OK
+    testing: scripts/quality.mjs      OK
+    testing: scripts/smoke-server.mjs   OK
+At least one error was detected in /tmp/football-director-source.zip.
+unzip_status=2
