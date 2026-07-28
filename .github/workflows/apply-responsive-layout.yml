@@ -33,17 +33,33 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify and apply reviewed patch
+      - name: Inspect patch payload
         shell: bash
         run: |
           set -euo pipefail
           cp .responsive-transfer/responsive-layout.patch.gz.b64 /tmp/responsive-layout.patch.gz.b64
+          {
+            wc -c /tmp/responsive-layout.patch.gz.b64
+            sha256sum /tmp/responsive-layout.patch.gz.b64
+            base64 --decode /tmp/responsive-layout.patch.gz.b64 > /tmp/responsive-layout.patch.gz
+            sha256sum /tmp/responsive-layout.patch.gz
+            gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
+            wc -c /tmp/responsive-layout.patch
+            sha256sum /tmp/responsive-layout.patch
+          } | tee responsive-patch-diagnostics.txt
+      - name: Verify patch payload
+        shell: bash
+        run: |
+          set -euo pipefail
           test "$(wc -c < /tmp/responsive-layout.patch.gz.b64)" -eq 16780
           echo "f37baad3b0d640db08da59052dd049ab1692885e42569a5b6489f1ad91247451  /tmp/responsive-layout.patch.gz.b64" | sha256sum -c -
-          base64 --decode /tmp/responsive-layout.patch.gz.b64 > /tmp/responsive-layout.patch.gz
           echo "aaded2406cc2af422017c6447b8230ad03134ba2c149c07688e37d954dd576ab  /tmp/responsive-layout.patch.gz" | sha256sum -c -
-          gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
           echo "1af2760a6ad1a3cf3cf8f09dfa4e23232b31da4a060680a4e7b89e39ec69cfaa  /tmp/responsive-layout.patch" | sha256sum -c -
+      - name: Check and apply reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check --whitespace=error /tmp/responsive-layout.patch
           git apply --index --whitespace=error /tmp/responsive-layout.patch
           rm -rf .responsive-transfer
           rm -f .github/workflows/apply-responsive-layout.yml
@@ -69,6 +85,7 @@ jobs:
         with:
           name: responsive-apply-evidence
           path: |
+            responsive-patch-diagnostics.txt
             playwright-report
             test-results
             responsive-screenshots
