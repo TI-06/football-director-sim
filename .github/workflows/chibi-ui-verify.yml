@@ -1,0 +1,64 @@
+name: Chibi mobile game UI verify
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
+      - 'playwright.config.mjs'
+      - '.github/workflows/chibi-ui-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify clean implementation diff
+        run: |
+          git fetch origin main --depth=1
+          files="$(git diff --name-only origin/main...HEAD)"
+          echo "$files"
+          echo "$files" | grep -qx 'src/styles.css'
+          echo "$files" | grep -qx 'src/ui/render.js'
+          echo "$files" | grep -q '^tests/'
+          if echo "$files" | grep -q '^\.github/ui-transfer/'; then
+            echo 'Temporary transfer files must not be merged.' >&2
+            exit 1
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Regression tests
+        run: npm test
+      - name: Quality check
+        run: npm run check
+      - name: HTTP smoke
+        run: npm run smoke
+      - name: Production build
+        run: npm run build
+      - name: Responsive browser audit
+        run: npm run test:responsive
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chibi-mobile-ui-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
