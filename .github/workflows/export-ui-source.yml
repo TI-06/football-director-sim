@@ -15,12 +15,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Archive source
         run: |
-          tar --exclude=.git --exclude=node_modules --exclude=dist -czf football-director-ui-source.tar.gz .
-          sha256sum football-director-ui-source.tar.gz > football-director-ui-source.tar.gz.sha256
+          mkdir -p "$RUNNER_TEMP/ui-source"
+          tar --exclude=.git --exclude=node_modules --exclude=dist -czf "$RUNNER_TEMP/ui-source/football-director-ui-source.tar.gz" .
+          sha256sum "$RUNNER_TEMP/ui-source/football-director-ui-source.tar.gz" > "$RUNNER_TEMP/ui-source/football-director-ui-source.tar.gz.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: football-director-ui-source
           path: |
-            football-director-ui-source.tar.gz
-            football-director-ui-source.tar.gz.sha256
+            ${{ runner.temp }}/ui-source/football-director-ui-source.tar.gz
+            ${{ runner.temp }}/ui-source/football-director-ui-source.tar.gz.sha256
           retention-days: 2
