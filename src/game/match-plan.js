@@ -42,6 +42,7 @@ export function createDefaultMatchPlan() {
     prioritizeYouth: false,
     preserveKeyPlayers: true,
     stopImportantMatches: true,
+    substitutionPolicies: {},
     scoreTactics: {
       leading: { mentality: 'cautious', pressing: 'normal', tempo: 'slow', passing: 'short', defensiveLine: 'normal', focus: 'balanced' },
       drawing: { mentality: 'balanced', pressing: 'normal', tempo: 'normal', passing: 'mixed', defensiveLine: 'normal', focus: 'balanced' },
@@ -69,6 +70,7 @@ export function normalizeMatchPlan(input = {}) {
     prioritizeYouth: input.prioritizeYouth ?? defaults.prioritizeYouth,
     preserveKeyPlayers: input.preserveKeyPlayers ?? defaults.preserveKeyPlayers,
     stopImportantMatches: input.stopImportantMatches ?? defaults.stopImportantMatches,
+    substitutionPolicies: Object.fromEntries(Object.entries(input.substitutionPolicies ?? {}).filter(([, value]) => ['automatic', 'never', 'after-60'].includes(value))),
     scoreTactics: {
       leading: normalizeTacticBlock(input.scoreTactics?.leading, defaults.scoreTactics.leading),
       drawing: normalizeTacticBlock(input.scoreTactics?.drawing, defaults.scoreTactics.drawing),
@@ -110,7 +112,12 @@ export function selectAutomaticSubstitutions({
   if (!availableSlots) return [];
   const context = { injuredIds: new Set(injuredIds), bookedIds: new Set(bookedIds), liveRatings };
   const candidates = starters
-    .filter((player) => player.position !== 'GK' || context.injuredIds.has(player.id))
+    .filter((player) => {
+      const policy = normalized.substitutionPolicies[player.id] ?? 'automatic';
+      if (policy === 'never') return false;
+      if (policy === 'after-60' && minute < 60) return false;
+      return player.position !== 'GK' || context.injuredIds.has(player.id);
+    })
     .map((player) => ({ player, detail: reasonFor(player, context, normalized) }))
     .filter((item) => item.detail)
     .sort((left, right) => right.detail.priority - left.detail.priority || left.player.id.localeCompare(right.player.id));

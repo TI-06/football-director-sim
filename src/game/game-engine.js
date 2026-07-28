@@ -39,6 +39,15 @@ import {
 import { buildSecretaryReport } from './secretary.js';
 import { createDefaultMatchPlan, normalizeMatchPlan } from './match-plan.js';
 import { SAVE_SCHEMA_VERSION } from './save.js';
+import { appointStaff, createInitialStaff, createStaffMarket, ensureEssentialStaff, progressStaffContracts } from './staff.js';
+import { createPromise, holdPlayerMeeting, initializePlayerRelations, updatePromises } from './player-relations.js';
+import { chooseSeasonObjective, createBoardEvaluation, updateBoardEvaluation } from './board-confidence.js';
+import { acceptManagerOffer, createManagerProfile, generateManagerOffers, recordManagerMatch } from './manager-career.js';
+import { createScoutingNetwork, scoutRegionalPlayer, toggleShortlist } from './scouting.js';
+import { createClubOffer, expireNegotiations, respondToClubOffer, submitAgentOffer } from './transfer-negotiation.js';
+import { createDefaultSetPieces, normalizeSetPieces, trainSetPieces } from './set-pieces.js';
+import { createMatchEnvironment } from './match-environment.js';
+import { createRivalries, isDerby } from './rivalries.js';
 
 const TACTIC_OPTIONS = {
   formation: Object.keys(FORMATIONS),
@@ -244,7 +253,7 @@ export function createNewGame({
     currentDate: seasonStartDate(1),
     seasonStatus: 'active',
     clubs: league.clubs,
-    players: league.players,
+    players: initializePlayerRelations(league.players, rng.fork('relations')),
     academy: league.academy,
     transferMarket: generateTransferMarket(rng, 40, 1),
     fixtures: competitions.leagueFixtures,
@@ -255,6 +264,19 @@ export function createNewGame({
     lineup,
     trainingFocus: 'balanced',
     matchPlan: createDefaultMatchPlan(),
+    staff: createInitialStaff(rng.fork('staff-initial')),
+    staffMarket: createStaffMarket(rng.fork('staff-market'), 27),
+    playerPromises: [],
+    meetingHistory: [],
+    boardEvaluation: createBoardEvaluation(selected),
+    managerProfile: createManagerProfile({ name: managerName, preferredTactic: tactics.formation }),
+    managerOffers: [],
+    scoutingNetwork: createScoutingNetwork(rng.fork('scouting-network')),
+    transferNegotiations: [],
+    loans: [],
+    setPieces: createDefaultSetPieces(),
+    rivalries: createRivalries(league.clubs),
+    nextMatchEnvironment: null,
     inbox: createWelcomeInbox(selected, managerName, clubMode),
     matchReports: [],
     finances: { ledger: [] },
@@ -381,6 +403,26 @@ function finishPreparedWeek(prepared, userReport) {
     next = settleWeeklyFinances(next, { userHomeMatch: false });
   }
 
+  if (userFixture && userReport) {
+    const isHome = userFixture.homeId === next.userClubId;
+    const userGoals = isHome ? userReport.homeGoals : userReport.awayGoals;
+    const opponentGoals = isHome ? userReport.awayGoals : userReport.homeGoals;
+    const result = userGoals > opponentGoals ? 'win' : userGoals === opponentGoals ? 'draw' : 'loss';
+    const youthStarter = next.lineup.starters.some((entry) => next.players.find((player) => player.id === entry.playerId)?.age <= 21);
+    next.managerProfile = recordManagerMatch(next.managerProfile, result, { youthStarter });
+    const club = userClub(next);
+    const axisDelta = result === 'win' ? 3 : result === 'draw' ? 0 : -3;
+    next.boardEvaluation = updateBoardEvaluation(next.boardEvaluation, {
+      ...next.boardEvaluation.axes,
+      league: clamp(next.boardEvaluation.axes.league + axisDelta, 0, 100),
+      supporters: club.fanMood,
+      attack: clamp(next.boardEvaluation.axes.attack + (userGoals >= 2 ? 2 : userGoals === 0 ? -1 : 0), 0, 100)
+    });
+  }
+  if (week % 8 === 0 && (next.managerProfile?.reputation ?? 0) >= 55) {
+    next.managerOffers = generateManagerOffers(next, createRng(`${next.seed}:manager-offers:${next.season}:${week}`));
+  }
+
   next = generateWeeklyEvent(next, createRng(`${next.seed}:event:${next.season}:${week}`));
   if (week % 4 === 0) {
     next = updatePlayerHappiness(next, createRng(`${next.seed}:happiness:${next.season}:${week}`));
@@ -404,6 +446,10 @@ function finishPreparedWeek(prepared, userReport) {
   }
 
   next.week += 1;
+  next = progressStaffContracts(next);
+  next = updatePromises(next);
+  next = expireNegotiations(next);
+  next = trainSetPieces(next);
   next.currentDate = dateForWeek(seasonStartDate(next.season), next.week);
   next.updatedAt = Date.now();
   if (week === SEASON_WEEKS) next = awardSeason(next);
@@ -442,6 +488,8 @@ export function prepareNextWeek(state) {
   if (userFixture) {
     prepared.home = buildTeam(next, userFixture.homeId);
     prepared.away = buildTeam(next, userFixture.awayId);
+    prepared.environment = createMatchEnvironment(createRng(`${next.seed}:environment:${next.season}:${week}:${userFixture.id}`), prepared.home.club, prepared.away.club, { derby: isDerby(next.rivalries, userFixture.homeId, userFixture.awayId) });
+    next.nextMatchEnvironment = prepared.environment;
   }
   return prepared;
 }
@@ -463,7 +511,9 @@ export function playNextWeek(state) {
       home: prepared.home,
       away: prepared.away,
       userSide: prepared.userSide,
-      matchPlan: state.matchPlan ?? createDefaultMatchPlan()
+      matchPlan: state.matchPlan ?? createDefaultMatchPlan(),
+      environment: prepared.environment,
+      setPieces: state.setPieces
     });
   }
   return completePreparedWeek(prepared, userReport);
@@ -568,6 +618,11 @@ export function performAction(state, action) {
       next.updatedAt = Date.now();
       return { ok: true, state: next, message: '試合プランを更新しました。' };
     }
+    case 'update-set-pieces': {
+      const next = deepClone(state);
+      next.setPieces = normalizeSetPieces({ ...next.setPieces, ...payload, routines: { ...next.setPieces?.routines, ...payload.routines } });
+      return { ok: true, state: next, message: 'セットプレー設定を更新しました。' };
+    }
     case 'update-training': {
       const next = deepClone(state);
       const allowed = ['balanced', 'attacking', 'defending', 'fitness', 'recovery', 'youth'];
@@ -594,12 +649,48 @@ export function performAction(state, action) {
       next.lineup.captainId = payload.playerId;
       return { ok: true, state: next, message: 'キャプテンを変更しました。' };
     }
+    case 'set-selection-policy': {
+      const next = deepClone(state);
+      const player = next.players.find((item) => item.id === payload.playerId && item.clubId === next.userClubId);
+      if (!player || !['automatic', 'starter-fixed', 'bench-fixed', 'excluded-fixed'].includes(payload.policy)) {
+        return { ok: false, state, message: '起用方針が不正です。' };
+      }
+      player.selectionPolicy = payload.policy;
+      next.lineup = selectBestLineup(clubPlayers(next, next.userClubId), next.tactics.formation);
+      return { ok: true, state: next, message: '起用方針を更新しました。' };
+    }
+    case 'set-substitution-policy': {
+      const next = deepClone(state);
+      const player = next.players.find((item) => item.id === payload.playerId && item.clubId === next.userClubId);
+      if (!player || !['automatic', 'never', 'after-60'].includes(payload.policy)) {
+        return { ok: false, state, message: '交代方針が不正です。' };
+      }
+      next.matchPlan = normalizeMatchPlan(next.matchPlan);
+      next.matchPlan.substitutionPolicies[payload.playerId] = payload.policy;
+      return { ok: true, state: next, message: '交代方針を更新しました。' };
+    }
     case 'set-penalty-taker': {
       const next = deepClone(state);
       if (!next.lineup.starters.some((entry) => entry.playerId === payload.playerId)) return { ok: false, state, message: '先発選手を指定してください。' };
       next.lineup.penaltyTakerId = payload.playerId;
       return { ok: true, state: next, message: 'PKキッカーを変更しました。' };
     }
+    case 'scout-regional-player': return scoutRegionalPlayer(state, payload.playerId, payload.region);
+    case 'toggle-shortlist': return toggleShortlist(state, payload.playerId, { priority: payload.priority, neededPosition: payload.neededPosition });
+    case 'create-club-offer': return createClubOffer(state, payload);
+    case 'respond-club-offer': return respondToClubOffer(state, payload.negotiationId, createRng(`${state.seed}:club-offer:${payload.negotiationId}:${state.week}`));
+    case 'submit-agent-offer': return submitAgentOffer(state, payload.negotiationId, payload);
+    case 'choose-season-objective': return chooseSeasonObjective(state, payload.level);
+    case 'accept-manager-offer': return acceptManagerOffer(state, payload.offerId);
+    case 'appoint-staff': return appointStaff(state, payload.staffId);
+    case 'hold-player-meeting': return holdPlayerMeeting(state, payload.playerId, payload.meetingType);
+    case 'create-player-promise': return createPromise(state, {
+      playerId: payload.playerId,
+      promiseType: payload.promiseType,
+      target: payload.target,
+      window: payload.window,
+      position: payload.position
+    });
     case 'buy-player': return buyPlayer(state, payload.playerId);
     case 'list-player': return listPlayerForSale(state, payload.playerId);
     case 'sell-player': return sellPlayer(state, payload.playerId, createRng(`${state.seed}:sale:${state.week}:${payload.playerId}`));

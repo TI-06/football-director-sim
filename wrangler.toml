@@ -2,3 +2,6 @@ name = "football-director-sim"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-07-26"
 send_metrics = false
+
+# Cloud save: bind a Cloudflare D1 database to GAME_DB in the Pages dashboard.
+# Apply migrations/0001_cloud_saves.sql before enabling the feature.

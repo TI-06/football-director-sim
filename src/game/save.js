@@ -1,4 +1,4 @@
-export const SAVE_SCHEMA_VERSION = 2;
+export const SAVE_SCHEMA_VERSION = 3;
 
 const SAVE_FORMAT = 'football-director-save';
 const SAVE_ENCODING = 'lzw-base64';
@@ -96,9 +96,9 @@ function decompressLzw(value) {
 function validateState(parsed) {
   if (!parsed || typeof parsed !== 'object') throw new Error('Invalid save data.');
   if (parsed.schemaVersion !== SAVE_SCHEMA_VERSION) throw new Error('Unsupported save schema version.');
-  const requiredArrays = ['clubs', 'players', 'academy', 'fixtures', 'inbox', 'matchReports'];
+  const requiredArrays = ['clubs', 'players', 'academy', 'fixtures', 'inbox', 'matchReports', 'staff', 'playerPromises', 'transferNegotiations', 'loans', 'rivalries'];
   if (requiredArrays.some((key) => !Array.isArray(parsed[key]))) throw new Error('Invalid save data structure.');
-  if (!parsed.userClubId || !parsed.tactics || !parsed.lineup || !parsed.cup || !parsed.standingsByDivision) throw new Error('Invalid save data structure.');
+  if (!parsed.userClubId || !parsed.tactics || !parsed.lineup || !parsed.cup || !parsed.standingsByDivision || !parsed.boardEvaluation || !parsed.managerProfile || !parsed.scoutingNetwork || !parsed.setPieces) throw new Error('Invalid save data structure.');
   return parsed;
 }
 

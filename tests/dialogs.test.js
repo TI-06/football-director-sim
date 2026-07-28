@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createConfirmDialog, createMenuDialog, renderGameDialog } from '../src/ui/dialogs.js';
+import { createCloudSaveDialog, createConfirmDialog, createMenuDialog, renderGameDialog } from '../src/ui/dialogs.js';
 
 test('game confirmation dialog renders accessible branded actions', () => {
   const dialog = createConfirmDialog({
@@ -32,4 +32,11 @@ test('game menu dialog exposes navigation commands without browser prompts', () 
   assert.match(html, /data-dialog-nav="tactics"/);
   assert.match(html, /data-dialog-command="export-save"/);
   assert.doesNotMatch(html, /window\.(?:alert|confirm|prompt)/);
+
+  const cloud = renderGameDialog(createCloudSaveDialog({ operation: 'save' }));
+  assert.match(cloud, /data-cloud-form/);
+  assert.match(cloud, /name="cloudUserId"/);
+  assert.match(cloud, /name="cloudPassword"/);
+  assert.match(cloud, /data-cloud-action="login"/);
+  assert.match(cloud, /data-cloud-action="register"/);
 });

@@ -112,3 +112,36 @@ test('preserve key players moves an equally tired higher-overall starter up the 
   });
   assert.equal(changes[0].playerOutId, 'z-key-player');
 });
+
+test('per-player substitution policy can block automatic replacement', () => {
+  const changes = selectAutomaticSubstitutions({
+    starters: [{ id: 'key', position: 'ST', fitness: 35, age: 28, overall: 84 }],
+    bench: [{ id: 'backup', position: 'ST', fitness: 90, age: 22, overall: 72 }],
+    minute: 70,
+    plan: { ...createDefaultMatchPlan(), substitutionPolicies: { key: 'never' } },
+    liveRatings: { key: 5.2 }
+  });
+  assert.deepEqual(changes, []);
+});
+
+test('after-60 substitution policy blocks replacement before minute 60 and permits it after', () => {
+  const input = {
+    starters: [{ id: 'key', position: 'CM', fitness: 35, age: 28, overall: 80 }],
+    bench: [{ id: 'backup', position: 'CM', fitness: 90, age: 22, overall: 72 }],
+    plan: { ...createDefaultMatchPlan(), substitutionMinute: 45, substitutionPolicies: { key: 'after-60' } },
+    liveRatings: { key: 5.5 }
+  };
+  assert.deepEqual(selectAutomaticSubstitutions({ ...input, minute: 55 }), []);
+  assert.equal(selectAutomaticSubstitutions({ ...input, minute: 65 })[0].playerOutId, 'key');
+});
+
+test('selection and substitution policies can be updated through game actions', () => {
+  const state = createNewGame({ clubId: 'jp1-01', seed: 'selection-policy-actions' });
+  const playerId = state.lineup.starters[0].playerId;
+  const selection = performAction(state, { type: 'set-selection-policy', payload: { playerId, policy: 'starter-fixed' } });
+  assert.equal(selection.ok, true);
+  assert.equal(selection.state.players.find((player) => player.id === playerId).selectionPolicy, 'starter-fixed');
+  const substitution = performAction(selection.state, { type: 'set-substitution-policy', payload: { playerId, policy: 'never' } });
+  assert.equal(substitution.ok, true);
+  assert.equal(substitution.state.matchPlan.substitutionPolicies[playerId], 'never');
+});
