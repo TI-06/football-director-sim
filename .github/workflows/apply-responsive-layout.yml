@@ -1,0 +1,64 @@
+name: Apply responsive layout
+
+on:
+  push:
+    branches:
+      - feature/responsive-layout-audit
+    paths:
+      - .responsive-transfer/responsive-layout.patch.gz.b64
+      - .github/workflows/apply-responsive-layout.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-responsive-layout
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/responsive-layout-audit
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify and apply reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .responsive-transfer/responsive-layout.patch.gz.b64 /tmp/responsive-layout.patch.gz.b64
+          test "$(wc -c < /tmp/responsive-layout.patch.gz.b64)" -eq 7596
+          echo "e7f94738004cb0965955225b7b2e2c8ae0c4f512c09cf87ce8d67e0d770d6419  /tmp/responsive-layout.patch.gz.b64" | sha256sum -c -
+          base64 --decode /tmp/responsive-layout.patch.gz.b64 > /tmp/responsive-layout.patch.gz
+          echo "e38e8b06e0108df0aebfc736dcccbf46604240e9b3f656aca5bcd782f18e8861  /tmp/responsive-layout.patch.gz" | sha256sum -c -
+          gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
+          echo "cdd300ee9e46ceff50f342945af5195db766cd8e32100f6a9cd035a084918de5  /tmp/responsive-layout.patch" | sha256sum -c -
+          git apply --index --whitespace=error /tmp/responsive-layout.patch
+          rm -rf .responsive-transfer
+          rm -f .github/workflows/apply-responsive-layout.yml
+          git add -A
+          git diff --cached --check
+      - name: Install dependencies and Chromium
+        run: |
+          npm install --no-package-lock
+          npx playwright install --with-deps chromium
+      - name: Run complete verification
+        run: |
+          npm test
+          npm run check
+          npm run smoke
+          npm run build
+          npm run test:responsive
+      - name: Commit clean feature tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "fix: optimize responsive game layouts"
+          git push origin HEAD:refs/heads/feature/responsive-layout-audit
