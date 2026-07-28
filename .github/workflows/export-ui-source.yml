@@ -1,0 +1,26 @@
+name: Export UI source
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive source
+        run: |
+          tar --exclude=.git --exclude=node_modules --exclude=dist -czf football-director-ui-source.tar.gz .
+          sha256sum football-director-ui-source.tar.gz > football-director-ui-source.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: football-director-ui-source
+          path: |
+            football-director-ui-source.tar.gz
+            football-director-ui-source.tar.gz.sha256
+          retention-days: 2
