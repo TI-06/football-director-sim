@@ -67,3 +67,36 @@ test('dropping one starter onto another slot swaps them without duplicates', () 
   assert.equal(changed.starters.find((entry) => entry.slotId === second.slotId).playerId, first.playerId);
   assert.equal(new Set(changed.starters.map((entry) => entry.playerId)).size, 11);
 });
+
+test('starter-fixed players remain in the starting eleven when available', () => {
+  const fixed = players.map((player, index) => ({
+    ...player,
+    selectionPolicy: index === 15 ? 'starter-fixed' : 'automatic',
+    overall: index === 15 ? 40 : player.overall
+  }));
+  const lineup = selectBestLineup(fixed, '4-2-3-1');
+  assert.equal(lineup.starters.some((entry) => entry.playerId === fixed[15].id), true);
+});
+
+test('starter-fixed players fall back to the bench below 55 fitness', () => {
+  const fixed = players.map((player, index) => ({
+    ...player,
+    selectionPolicy: index === 15 ? 'starter-fixed' : 'automatic',
+    fitness: index === 15 ? 54 : player.fitness
+  }));
+  const lineup = selectBestLineup(fixed, '4-2-3-1');
+  assert.equal(lineup.starters.some((entry) => entry.playerId === fixed[15].id), false);
+  assert.equal(lineup.bench.includes(fixed[15].id), true);
+});
+
+test('bench-fixed and excluded-fixed policies are respected by auto selection', () => {
+  const fixed = players.map((player, index) => ({
+    ...player,
+    selectionPolicy: index === 0 ? 'bench-fixed' : index === 1 ? 'excluded-fixed' : 'automatic'
+  }));
+  const lineup = selectBestLineup(fixed, '4-3-3');
+  assert.equal(lineup.starters.some((entry) => entry.playerId === fixed[0].id), false);
+  assert.equal(lineup.bench.includes(fixed[0].id), true);
+  assert.equal(lineup.starters.some((entry) => entry.playerId === fixed[1].id), false);
+  assert.equal(lineup.bench.includes(fixed[1].id), false);
+});

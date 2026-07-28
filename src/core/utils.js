@@ -16,6 +16,19 @@ export function sum(values) {
   return values.reduce((total, value) => total + value, 0);
 }
 
+
+export function formatInteger(value) {
+  return String(Math.round(Number(value) || 0));
+}
+
+export function formatRating(value) {
+  return (Number(value) || 0).toFixed(1);
+}
+
+export function formatXg(value) {
+  return (Number(value) || 0).toFixed(2);
+}
+
 export function formatMoney(value) {
   const amount = Math.round(Number(value) || 0);
   const sign = amount < 0 ? '-' : '';

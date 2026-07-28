@@ -45,15 +45,41 @@ export function playerSlotScore(player, slotPosition) {
   return (player.overall * 0.58 + roleAttribute * 0.32 + condition * 0.1) * compatibility;
 }
 
+export function normalizeSelectionPolicy(player) {
+  const valid = ['automatic', 'starter-fixed', 'bench-fixed', 'excluded-fixed'];
+  return valid.includes(player?.selectionPolicy) ? player.selectionPolicy : 'automatic';
+}
+
 export function selectBestLineup(players, formationId = '4-2-3-1') {
   const formation = FORMATIONS[formationId] ?? FORMATIONS['4-2-3-1'];
-  const eligible = players.filter((player) => player.injuryWeeks <= 0 && !player.suspended);
+  const available = players.filter((player) => player.injuryWeeks <= 0 && !player.suspended && normalizeSelectionPolicy(player) !== 'excluded-fixed');
+  const forcedStarters = available
+    .filter((player) => normalizeSelectionPolicy(player) === 'starter-fixed' && player.fitness >= 55)
+    .sort((a, b) => b.overall - a.overall)
+    .slice(0, 11);
+  const forcedBench = available.filter((player) => {
+    const policy = normalizeSelectionPolicy(player);
+    return policy === 'bench-fixed' || (policy === 'starter-fixed' && player.fitness < 55);
+  });
+  const starterPool = available.filter((player) => !forcedBench.some((fixed) => fixed.id === player.id));
   const used = new Set();
   const starters = [];
+  const remainingSlots = [...formation.slots];
 
-  const orderedSlots = [...formation.slots].sort((a, b) => (a.position === 'GK' ? -1 : b.position === 'GK' ? 1 : 0));
+  for (const player of forcedStarters) {
+    const slot = remainingSlots
+      .filter((candidate) => !starters.some((entry) => entry.slotId === candidate.id))
+      .sort((a, b) => playerSlotScore(player, b.position) - playerSlotScore(player, a.position))[0];
+    if (!slot) continue;
+    used.add(player.id);
+    starters.push({ slotId: slot.id, slotPosition: slot.position, playerId: player.id, x: slot.x, y: slot.y });
+  }
+
+  const orderedSlots = remainingSlots
+    .filter((slot) => !starters.some((entry) => entry.slotId === slot.id))
+    .sort((a, b) => (a.position === 'GK' ? -1 : b.position === 'GK' ? 1 : 0));
   for (const slot of orderedSlots) {
-    const candidates = eligible
+    const candidates = starterPool
       .filter((player) => !used.has(player.id))
       .sort((a, b) => playerSlotScore(b, slot.position) - playerSlotScore(a, slot.position));
     const selected = candidates[0];
@@ -63,11 +89,12 @@ export function selectBestLineup(players, formationId = '4-2-3-1') {
   }
 
   starters.sort((a, b) => formation.slots.findIndex((slot) => slot.id === a.slotId) - formation.slots.findIndex((slot) => slot.id === b.slotId));
-  const bench = eligible
-    .filter((player) => !used.has(player.id))
+  const forcedBenchIds = forcedBench.filter((player) => !used.has(player.id)).map((player) => player.id);
+  const automaticBench = available
+    .filter((player) => !used.has(player.id) && !forcedBenchIds.includes(player.id))
     .sort((a, b) => b.overall + b.form * 0.1 - (a.overall + a.form * 0.1))
-    .slice(0, 7)
     .map((player) => player.id);
+  const bench = [...forcedBenchIds, ...automaticBench].slice(0, 7);
   return { starters, bench, captainId: starters.find((entry) => players.find((player) => player.id === entry.playerId)?.position !== 'GK')?.playerId ?? starters[0]?.playerId ?? null, penaltyTakerId: starters.find((entry) => entry.slotPosition === 'ST')?.playerId ?? starters[0]?.playerId ?? null };
 }
 

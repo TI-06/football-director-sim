@@ -90,6 +90,7 @@ export function createLiveMatchSession({ seed, home, away, userSide = 'home', ma
     participants: createParticipants(sides),
     liveFitness: createFitness(sides),
     liveRatings: createRatings(createParticipants(sides)),
+    ratingMinutes: Object.fromEntries(Object.keys(createParticipants(sides)).map((playerId) => [playerId, 0])),
     bookedIds: { home: [], away: [] },
     injuredIds: { home: [], away: [] },
     injuries: [],
@@ -116,10 +117,7 @@ function relevantPhaseEvents(report, duration, start) {
 
 function applyEventEffects(session, events) {
   for (const event of events) {
-    if (event.type === 'goal' && event.playerId) session.liveRatings[event.playerId] = round((session.liveRatings[event.playerId] ?? 6.5) + 0.85, 1);
-    if (event.type === 'goal' && event.assistId) session.liveRatings[event.assistId] = round((session.liveRatings[event.assistId] ?? 6.5) + 0.4, 1);
     if (event.type === 'card' && event.playerId) {
-      session.liveRatings[event.playerId] = round((session.liveRatings[event.playerId] ?? 6.5) - 0.2, 1);
       if (!session.bookedIds[event.side].includes(event.playerId)) session.bookedIds[event.side].push(event.playerId);
     }
     if (event.type === 'injury' && event.playerId) {
@@ -133,6 +131,17 @@ function applyEventEffects(session, events) {
         name: event.injuryName ?? '打撲'
       });
     }
+  }
+}
+
+function applyPhaseRatings(session, report, duration) {
+  for (const rating of report.playerRatings ?? []) {
+    const participant = session.participants[rating.playerId];
+    if (!participant || participant.exitedAt !== null) continue;
+    const previousMinutes = session.ratingMinutes[rating.playerId] ?? 0;
+    const previous = session.liveRatings[rating.playerId] ?? 6.5;
+    session.liveRatings[rating.playerId] = round((previous * previousMinutes + rating.rating * duration) / Math.max(1, previousMinutes + duration), 2);
+    session.ratingMinutes[rating.playerId] = previousMinutes + duration;
   }
 }
 
@@ -242,6 +251,7 @@ export function advanceLiveMatchSession(session, instruction = {}) {
   const events = relevantPhaseEvents(report, duration, phaseDef.start);
   const stats = phaseStats(report, events, duration);
   addPhaseTotals(next, stats, duration);
+  applyPhaseRatings(next, report, duration);
   applyEventEffects(next, events);
   updateFitness(next, stats);
   next.events.push(...events);
@@ -306,6 +316,7 @@ export function makeLiveSubstitution(session, { side, playerOutId, playerInId, r
     exitedAt: null
   };
   next.liveRatings[playerInId] ??= 6.5;
+  next.ratingMinutes[playerInId] ??= 0;
   const event = {
     minute: next.minute,
     type: 'substitution',
@@ -337,7 +348,7 @@ function participantRatings(session) {
     const won = participant.side === 'home' ? homeWon : awayWon;
     const lost = participant.side === 'home' ? awayWon : homeWon;
     const base = session.liveRatings[participant.playerId] ?? 6.5;
-    const rating = clamp(base + (won ? 0.25 : lost ? -0.2 : 0) + goals * 0.25 + assists * 0.15, 4.2, 10);
+    const rating = clamp(base, 4.2, 10);
     return {
       playerId: participant.playerId,
       playerName: player?.name ?? '不明',

@@ -1,9 +1,12 @@
 import { completePreparedWeek, createNewGame, performAction, playNextWeek, prepareNextWeek } from '../game/game-engine.js';
 import { advanceLiveMatchSession, createLiveMatchSession, finalizeLiveMatch, makeLiveSubstitution } from '../game/live-match.js';
 import { deserializeGame, serializeGame } from '../game/save.js';
-import { autoAdvanceStopReason, importantFixtureReason, unresolvedDecisionIds } from './auto-advance.js';
+import { CloudSaveClient } from '../services/cloud-save.js';
+import { autoAdvanceStopReason, importantFixtureReason, operationalStopReason, unresolvedDecisionIds } from './auto-advance.js';
+import { authenticateCloudAction } from './cloud-operations.js';
+import { shortcutView } from './game-shell.js';
 import { renderApplication, renderLiveMatchCenter, renderMatchModal, renderNewGame } from './render.js';
-import { createConfirmDialog, createMenuDialog, renderGameDialog } from './dialogs.js';
+import { createCloudSaveDialog, createConfirmDialog, createMenuDialog, renderGameDialog } from './dialogs.js';
 import { compareSquadRows, matchesSquadFilters } from './squad-controls.js';
 
 const STORAGE_KEY = 'football-director-save-v2';
@@ -21,6 +24,7 @@ let preparedWeek = null;
 let liveMatchSession = null;
 let dialogConfirmHandler = null;
 let dialogReturnFocus = null;
+const cloudClient = new CloudSaveClient();
 
 const squadViewState = {
   sort: 'role',
@@ -167,6 +171,43 @@ function confirmAction(options, handler) {
   });
 }
 
+function openCloudDialog(operation) {
+  if (operation === 'save' && !state) return;
+  openDialog(createCloudSaveDialog({ operation }));
+}
+
+async function runCloudOperation(action) {
+  const form = elements().modalRoot.querySelector('[data-cloud-form]');
+  if (!form) return;
+  const data = new FormData(form);
+  const userId = data.get('cloudUserId');
+  const password = data.get('cloudPassword');
+  const operation = form.dataset.cloudOperation;
+  const buttons = [...form.querySelectorAll('button')];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    await authenticateCloudAction(cloudClient, action, userId, password);
+    if (operation === 'save') {
+      await cloudClient.save(serializeGame(state));
+      closeDialog();
+      notify(action === 'register' ? 'IDを登録してクラウドへ保存しました。' : 'クラウドへ保存しました。');
+      return;
+    }
+    const result = await cloudClient.load();
+    if (!result.save) throw new Error('このIDにはクラウドセーブがありません。');
+    cancelAutoAdvance();
+    state = deserializeGame(result.save);
+    currentView = 'dashboard';
+    persist();
+    closeDialog();
+    render();
+    notify('クラウドセーブを読み込みました。');
+  } catch (error) {
+    notify(error.message, 'error');
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
 function openGameMenu() {
   openDialog(createMenuDialog({
     title: 'クラブメニュー',
@@ -178,6 +219,8 @@ function openGameMenu() {
       { label: '秘書レポート', description: '今週の重要事項', icon: 'star', nav: 'secretary' },
       { label: 'クラブ経営', description: '財務・施設・投資', icon: 'club', nav: 'club' },
       { label: '受信トレイ', description: '判断イベントと連絡', icon: 'inbox', nav: 'inbox' },
+      { label: 'クラウドへ保存', description: 'ID・パスワードで1枠保存', icon: 'save', command: 'cloud-save' },
+      { label: 'クラウドから読み込む', description: '別端末のキャリアを復元', icon: 'upload', command: 'cloud-load' },
       { label: 'セーブを書き出す', icon: 'download', command: 'export-save' },
       { label: 'セーブを読み込む', icon: 'upload', command: 'import-save' },
       { label: 'キャリアをリセット', icon: 'reset', command: 'reset-game', danger: true }
@@ -389,6 +432,11 @@ function runAutoAdvanceStep() {
     stopAutoAdvance(`シーズン${state.season}の全試合が終了しました。`, { notifyUser: true });
     return;
   }
+  if (stopReason) {
+    const messages = { promise: '期限が近い選手との約束', 'board-warning': '理事会からの警告', 'manager-offer': '監督オファー', negotiation: '進行中の移籍交渉', 'staff-contract': 'スタッフの契約満了' };
+    stopAutoAdvance(`${messages[stopReason] ?? '重要事項'}を確認するため自動進行を停止しました。`, { notifyUser: true });
+    return;
+  }
 
   autoAdvanceMessage = `WEEK ${week}完了。次の試合を準備しています。`;
   render();
@@ -403,6 +451,13 @@ function startAutoAdvance() {
   if (unresolvedDecisionIds(state).length) {
     currentView = 'inbox';
     autoAdvanceMessage = '未処理の判断イベントを解決すると自動進行できます。';
+    render();
+    notify(autoAdvanceMessage, 'error');
+    return;
+  }
+  const operation = operationalStopReason(state);
+  if (operation) {
+    autoAdvanceMessage = '今週の優先事項を確認すると自動進行できます。';
     render();
     notify(autoAdvanceMessage, 'error');
     return;
@@ -525,7 +580,13 @@ function handleClick(event) {
   if (command === 'start-next-season') return applyAction('start-next-season');
   if (command === 'export-save') return exportSave();
   if (command === 'import-save') return elements().importInput.click();
+  if (command === 'cloud-save') return openCloudDialog('save');
+  if (command === 'cloud-load') return openCloudDialog('load');
   if (command === 'open-game-menu') return openGameMenu();
+  if (command === 'toggle-sidebar') {
+    document.body.classList.toggle('sidebar-collapsed');
+    return;
+  }
   if (command === 'reset-game') {
     confirmAction({
       id: 'reset-career',
@@ -565,6 +626,20 @@ function handleClick(event) {
       confirmAction({ id: 'release-player', title: `${player?.name ?? '選手'}との契約を解除しますか？`, message: '12週分の給与を補償金として支払い、選手を自由契約にします。', detail: 'スカッド人数と残り資金を確認してください。', confirmLabel: '契約を解除', tone: 'danger' }, () => applyAction('release-player', { playerId }));
       return;
     }
+    if (action === 'hold-player-meeting') return applyAction('hold-player-meeting', { playerId, meetingType: 'praise' });
+    if (action === 'create-player-promise') return applyAction('create-player-promise', { playerId, promiseType: 'starts', target: 3, window: 5 });
+    if (action === 'appoint-staff') return applyAction('appoint-staff', { staffId: actionElement.dataset.staffId });
+    if (action === 'choose-season-objective') return applyAction('choose-season-objective', { level: actionElement.dataset.level });
+    if (action === 'accept-manager-offer') return applyAction('accept-manager-offer', { offerId: actionElement.dataset.offerId });
+    if (action === 'toggle-shortlist') return applyAction('toggle-shortlist', { playerId, priority: 'medium', neededPosition: player?.position });
+    if (action === 'scout-regional-player') return applyAction('scout-regional-player', { playerId, region: actionElement.dataset.region });
+    if (action === 'create-club-offer') {
+      const fee = Number(actionElement.dataset.fee ?? player?.askingPrice ?? 0);
+      confirmAction({ id: 'club-offer', title: `${player?.name ?? '選手'}へオファーしますか？`, message: `即時移籍金 ${Math.round(fee / 10_000)}万円を提示します。`, detail: 'クラブ回答後、合意した場合は代理人交渉へ進みます。', confirmLabel: 'クラブへ提示' }, () => applyAction('create-club-offer', { playerId, immediateFee: fee, clauses: {}, offerType: 'permanent' }));
+      return;
+    }
+    if (action === 'respond-club-offer') return applyAction('respond-club-offer', { negotiationId: actionElement.dataset.negotiationId });
+    if (action === 'submit-agent-offer') return applyAction('submit-agent-offer', { negotiationId: actionElement.dataset.negotiationId, wage: Number(actionElement.dataset.wage), years: 3, signingBonus: 0, role: 'rotation', releaseClause: 0 });
     if (action === 'scout-player') return applyAction('scout-player', { playerId });
     if (action === 'buy-player') {
       confirmAction({ id: 'buy-player', title: `${player?.name ?? '選手'}を獲得しますか？`, message: '移籍金と給与条件に合意してトップチームへ迎えます。', detail: player ? `OVR ${player.overall} · ${player.position} · ${player.age}歳` : '', confirmLabel: '獲得を決定' }, () => applyAction('buy-player', { playerId }));
@@ -609,6 +684,22 @@ function handleChange(event) {
     const scoreState = event.target.dataset.matchPlanScore;
     const key = event.target.dataset.matchPlanScoreKey;
     applyAction('update-match-plan', { scoreTactics: { [scoreState]: { [key]: event.target.value } } });
+    return;
+  }
+  if (event.target.matches('[data-selection-policy]')) {
+    applyAction('set-selection-policy', { playerId: event.target.dataset.playerId, policy: event.target.value });
+    return;
+  }
+  if (event.target.matches('[data-substitution-policy]')) {
+    applyAction('set-substitution-policy', { playerId: event.target.dataset.playerId, policy: event.target.value });
+    return;
+  }
+  if (event.target.matches('[data-set-piece-key]')) {
+    applyAction('update-set-pieces', { routines: { [event.target.dataset.setPieceKey]: { template: event.target.value } } });
+    return;
+  }
+  if (event.target.matches('[data-set-piece-training]')) {
+    applyAction('update-set-pieces', { trainingShare: Number(event.target.value) });
     return;
   }
   if (event.target.matches('[data-lineup-slot]')) {
@@ -698,7 +789,12 @@ function bindEvents() {
     const [file] = importInput.files;
     if (file) importSave(file);
   });
-  modalRoot.addEventListener('click', (event) => {
+  modalRoot.addEventListener('click', async (event) => {
+    const cloudAction = event.target.closest('[data-cloud-action]')?.dataset.cloudAction;
+    if (cloudAction) {
+      await runCloudOperation(cloudAction);
+      return;
+    }
     const dialogNav = event.target.closest('[data-dialog-nav]');
     if (dialogNav) {
       const view = dialogNav.dataset.dialogNav;
@@ -713,6 +809,8 @@ function bindEvents() {
       closeDialog();
       if (dialogCommand === 'export-save') exportSave();
       if (dialogCommand === 'import-save') elements().importInput.click();
+      if (dialogCommand === 'cloud-save') openCloudDialog('save');
+      if (dialogCommand === 'cloud-load') openCloudDialog('load');
       if (dialogCommand === 'reset-game') handleClick({ target: app.querySelector('[data-command="reset-game"]') ?? document.createElement('span') });
       return;
     }
@@ -748,6 +846,18 @@ function bindEvents() {
   });
   document.addEventListener('keydown', (event) => {
     const dialog = modalRoot.querySelector('[data-game-dialog]');
+    const target = event.target;
+    const editing = target instanceof HTMLElement && (target.matches('input, select, textarea') || target.isContentEditable);
+    if (!dialog && !liveMatchSession && !editing && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const view = shortcutView(event.key);
+      if (view) {
+        event.preventDefault();
+        currentView = view;
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
     if (event.key === 'Escape') {
       if (dialog) {
         closeDialog();

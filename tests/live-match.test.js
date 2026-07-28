@@ -120,3 +120,23 @@ test('prepared week commits the user report exactly once and advances the calend
   const repeated = completePreparedWeek(prepared, report);
   assert.equal(repeated.ok, false);
 });
+
+test('phase ratings are accumulated into final live match ratings instead of remaining at 6.5', () => {
+  const state = createNewGame({ clubId: 'jp1-01', seed: 'live-rating-accumulation' });
+  const fixture = state.fixtures.find((item) => [item.homeId, item.awayId].includes(state.userClubId));
+  const prepared = prepareNextWeek(state);
+  let session = createLiveMatchSession({ seed: prepared.matchSeed, home: prepared.home, away: prepared.away, userSide: prepared.userSide, matchPlan: state.matchPlan });
+  while (!session.completed) session = advanceLiveMatchSession(session).session;
+  const report = finalizeLiveMatch(session);
+  assert.equal(report.playerRatings.some((rating) => rating.rating !== 6.5), true);
+  assert.equal(report.playerRatings.every((rating) => Number.isFinite(rating.rating)), true);
+});
+
+test('final live rating does not add goal and assist bonuses a second time', () => {
+  const state = createNewGame({ clubId: 'jp1-01', seed: 'live-rating-no-double' });
+  const prepared = prepareNextWeek(state);
+  let session = createLiveMatchSession({ seed: prepared.matchSeed, home: prepared.home, away: prepared.away, userSide: prepared.userSide, matchPlan: state.matchPlan });
+  while (!session.completed) session = advanceLiveMatchSession(session).session;
+  const report = finalizeLiveMatch(session);
+  for (const rating of report.playerRatings) assert.ok(rating.rating <= 10 && rating.rating >= 4.2);
+});
