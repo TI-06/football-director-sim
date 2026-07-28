@@ -38,12 +38,12 @@ jobs:
         run: |
           set -euo pipefail
           cp .responsive-transfer/responsive-layout.patch.gz.b64 /tmp/responsive-layout.patch.gz.b64
-          test "$(wc -c < /tmp/responsive-layout.patch.gz.b64)" -eq 16728
-          echo "92e3a94055adf3bad535e3e9a7cf0bab5d89b4abb7c1b79d6e3130dab889335b  /tmp/responsive-layout.patch.gz.b64" | sha256sum -c -
+          test "$(wc -c < /tmp/responsive-layout.patch.gz.b64)" -eq 16780
+          echo "f37baad3b0d640db08da59052dd049ab1692885e42569a5b6489f1ad91247451  /tmp/responsive-layout.patch.gz.b64" | sha256sum -c -
           base64 --decode /tmp/responsive-layout.patch.gz.b64 > /tmp/responsive-layout.patch.gz
-          echo "5cf5445a7207aa4de3a85faa371c754e2ba450a35079b8bee1e3c1929f7567f8  /tmp/responsive-layout.patch.gz" | sha256sum -c -
+          echo "aaded2406cc2af422017c6447b8230ad03134ba2c149c07688e37d954dd576ab  /tmp/responsive-layout.patch.gz" | sha256sum -c -
           gzip --decompress --stdout /tmp/responsive-layout.patch.gz > /tmp/responsive-layout.patch
-          echo "ad41e170420e8d8c61975999f0c105196387bf80f1e74418a0c3e4dc459d44a5  /tmp/responsive-layout.patch" | sha256sum -c -
+          echo "1af2760a6ad1a3cf3cf8f09dfa4e23232b31da4a060680a4e7b89e39ec69cfaa  /tmp/responsive-layout.patch" | sha256sum -c -
           git apply --index --whitespace=error /tmp/responsive-layout.patch
           rm -rf .responsive-transfer
           rm -f .github/workflows/apply-responsive-layout.yml
