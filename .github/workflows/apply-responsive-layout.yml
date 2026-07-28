@@ -1,6 +1,12 @@
 name: Apply responsive layout
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .responsive-transfer/responsive-layout.patch.gz.b64
+      - .github/workflows/apply-responsive-layout.yml
   push:
     branches:
       - feature/responsive-layout-audit
