@@ -1,0 +1,43 @@
+name: Responsive layout audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  responsive-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run regression tests
+        run: |
+          npm test
+          npm run check
+          npm run smoke
+          npm run build
+      - name: Run seven-viewport browser audit
+        run: npm run test:responsive
+      - name: Upload responsive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-layout-evidence
+          path: |
+            playwright-report
+            test-results
+            responsive-screenshots
+          if-no-files-found: warn
+          retention-days: 14
