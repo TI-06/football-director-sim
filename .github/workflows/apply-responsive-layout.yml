@@ -68,8 +68,8 @@ jobs:
           git apply --index --whitespace=error /tmp/responsive-layout.patch
           git apply --check --whitespace=error .responsive-transfer/mobile-row-fix.patch
           git apply --index --whitespace=error .responsive-transfer/mobile-row-fix.patch
+          git restore --source=HEAD --staged --worktree .github/workflows
           rm -rf .responsive-transfer
-          rm -f .github/workflows/apply-responsive-layout.yml
           git add -A
           git diff --cached --check
       - name: Install dependencies and Chromium
@@ -97,7 +97,7 @@ jobs:
             responsive-screenshots
           if-no-files-found: warn
           retention-days: 2
-      - name: Commit clean feature tree
+      - name: Commit verified source tree
         shell: bash
         run: |
           set -euo pipefail
