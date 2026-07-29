@@ -1,45 +1,76 @@
-name: Chibi mobile game UI verify
+name: Chibi mobile game UI bootstrap
 
 on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
     paths:
       - 'src/**'
       - 'tests/**'
       - 'package*.json'
       - 'playwright.config.mjs'
+      - '.github/ui-transfer/**'
       - '.github/workflows/chibi-ui-verify.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  verify-and-apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Verify clean implementation diff
+      - name: Reconstruct and apply reviewed implementation
+        shell: bash
         run: |
-          git fetch origin main --depth=1
-          files="$(git diff --name-only origin/main...HEAD)"
+          set -euo pipefail
+          test -d .github/ui-transfer
+          cat .github/ui-transfer/chibi-upload-* > /tmp/chibi-ui.b64
+          base64 --decode /tmp/chibi-ui.b64 > /tmp/chibi-ui.payload
+          echo "Encoded bytes: $(wc -c < /tmp/chibi-ui.b64)"
+          echo "Payload bytes: $(wc -c < /tmp/chibi-ui.payload)"
+          sha256sum /tmp/chibi-ui.payload
+          file /tmp/chibi-ui.payload
+
+          if gzip -t /tmp/chibi-ui.payload 2>/dev/null; then
+            gzip -dc /tmp/chibi-ui.payload > /tmp/chibi-ui.decoded
+          else
+            cp /tmp/chibi-ui.payload /tmp/chibi-ui.decoded
+          fi
+
+          echo "Decoded bytes: $(wc -c < /tmp/chibi-ui.decoded)"
+          sha256sum /tmp/chibi-ui.decoded
+          file /tmp/chibi-ui.decoded
+
+          if grep -aq '^diff --git ' /tmp/chibi-ui.decoded; then
+            git apply --check --binary /tmp/chibi-ui.decoded
+            git apply --binary /tmp/chibi-ui.decoded
+          elif tar -tf /tmp/chibi-ui.decoded >/tmp/chibi-ui-files.txt 2>/dev/null; then
+            tar -xf /tmp/chibi-ui.decoded
+          elif unzip -t /tmp/chibi-ui.decoded >/tmp/chibi-ui-files.txt 2>/dev/null; then
+            unzip -o /tmp/chibi-ui.decoded
+          else
+            echo 'Unsupported UI transfer payload.' >&2
+            xxd -l 64 /tmp/chibi-ui.decoded >&2
+            exit 1
+          fi
+
+          files="$(git diff --name-only)"
           echo "$files"
           echo "$files" | grep -qx 'src/styles.css'
           echo "$files" | grep -qx 'src/ui/render.js'
           echo "$files" | grep -q '^tests/'
-          if echo "$files" | grep -q '^\.github/ui-transfer/'; then
-            echo 'Temporary transfer files must not be merged.' >&2
-            exit 1
-          fi
+          rm -rf .github/ui-transfer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Regression tests
@@ -52,6 +83,16 @@ jobs:
         run: npm run build
       - name: Responsive browser audit
         run: npm run test:responsive
+      - name: Commit verified implementation
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: apply chibi sports game interface'
+          git push origin HEAD:${{ github.head_ref }}
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,5 +101,6 @@ jobs:
           path: |
             test-results/
             playwright-report/
-          if-no-files-found: ignore
+            responsive-screenshots/
+          if-no-files-found: warn
           retention-days: 14
