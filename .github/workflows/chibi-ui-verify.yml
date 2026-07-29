@@ -30,10 +30,40 @@ jobs:
         run: |
           set -euo pipefail
           test -d .github/ui-transfer
-          cat .github/ui-transfer/chibi-upload-* > /tmp/chibi-ui.b64
-          base64 --decode /tmp/chibi-ui.b64 > /tmp/chibi-ui.payload
-          echo "Encoded bytes: $(wc -c < /tmp/chibi-ui.b64)"
-          echo "Payload bytes: $(wc -c < /tmp/chibi-ui.payload)"
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+
+          parts = sorted(Path('.github/ui-transfer').glob('chibi-upload-*'))
+          if not parts:
+              raise SystemExit('No transfer parts found.')
+
+          texts = [''.join(path.read_text(encoding='utf-8').split()) for path in parts]
+          print('Parts:', len(parts))
+          print('Part lengths:', ','.join(str(len(text)) for text in texts))
+
+          candidates = []
+          joined = ''.join(texts)
+          candidates.append(('joined-standard', lambda: base64.b64decode(joined, validate=True)))
+          candidates.append(('joined-urlsafe', lambda: base64.urlsafe_b64decode(joined + '=' * (-len(joined) % 4))))
+          candidates.append(('per-part-standard', lambda: b''.join(base64.b64decode(text, validate=True) for text in texts)))
+          candidates.append(('per-part-urlsafe', lambda: b''.join(base64.urlsafe_b64decode(text + '=' * (-len(text) % 4)) for text in texts)))
+
+          errors = []
+          for name, decoder in candidates:
+              try:
+                  payload = decoder()
+              except Exception as exc:
+                  errors.append(f'{name}: {exc}')
+                  continue
+              Path('/tmp/chibi-ui.payload').write_bytes(payload)
+              print('Decoded mode:', name)
+              print('Payload bytes:', len(payload))
+              break
+          else:
+              raise SystemExit('Unable to decode transfer parts. ' + ' | '.join(errors))
+          PY
+
           sha256sum /tmp/chibi-ui.payload
           file /tmp/chibi-ui.payload
 
