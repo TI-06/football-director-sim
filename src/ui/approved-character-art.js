@@ -1,3 +1,9 @@
+import spritePart1 from './character-sprite/part-1.js';
+import spritePart2 from './character-sprite/part-2.js';
+import spritePart3 from './character-sprite/part-3.js';
+
+const APPROVED_SPRITE_URL = `url("data:image/webp;base64,${spritePart1}${spritePart2}${spritePart3}")`;
+
 function spriteMarkup(key, alt, extraClass = '') {
   return `<span class="approved-character-sprite approved-character-sprite--${key} ${extraClass}" role="img" aria-label="${alt}"></span>`;
 }
@@ -48,6 +54,7 @@ function enhanceAceCard(root) {
 }
 
 export function applyApprovedCharacterArt(root = document) {
+  root.documentElement?.style.setProperty('--approved-character-sprite', APPROVED_SPRITE_URL);
   root.documentElement?.classList.add('approved-character-ui');
   enhanceDashboard(root);
   enhanceRoleHeroes(root);
