@@ -1,0 +1,50 @@
+.approved-character-sprite {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  background-image: var(--approved-character-sprite);
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .36));
+}
+.approved-character-sprite--mina { background-position: 0 0; }
+.approved-character-sprite--sota { background-position: 100% 0; }
+.approved-character-sprite--rei { background-position: 0 100%; }
+.approved-character-sprite--kazuo { background-position: 100% 100%; }
+
+.game-hero__character .approved-character-sprite { width: 170px; margin-left: auto; }
+.role-hero__character .approved-character-sprite { width: 120px; margin-left: auto; }
+.live-assistant .approved-character-sprite { width: 48px; min-width: 48px; }
+.pitch-player__portrait .approved-character-sprite { width: 46px; margin: -8px auto 0; }
+
+.approved-squad-hero {
+  position: relative;
+  min-height: 214px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(54, 221, 255, .30);
+  border-radius: 22px;
+  background: radial-gradient(circle at 84% 12%, rgba(54, 221, 255, .20), transparent 33%), linear-gradient(135deg, #123b76, #08172f 62%, #071225);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 38px rgba(0,0,0,.22);
+}
+.approved-squad-hero__copy { position: relative; z-index: 2; width: 68%; padding: 22px; }
+.approved-squad-hero h2 { margin: 8px 0 7px; font-size: clamp(28px, 3.8vw, 46px); line-height: 1; letter-spacing: -.05em; }
+.approved-squad-hero p { margin: 0; color: #b8cce2; font-size: 12px; line-height: 1.6; }
+.approved-squad-hero__message { margin-top: 16px; max-width: 430px; padding: 10px 12px; border: 1px solid rgba(54,221,255,.25); border-radius: 12px; background: rgba(4,13,28,.72); }
+.approved-squad-hero__message strong, .approved-squad-hero__message span { display:block; }
+.approved-squad-hero__message strong { color: var(--game-cyan); font-size: 10px; }
+.approved-squad-hero__message span { margin-top: 3px; color:#d9e7f5; font-size: 9px; line-height:1.5; }
+.approved-squad-hero__character { position:absolute; right:3%; bottom:-28px; width:170px; }
+.pitch-player--approved-ace { border-color: rgba(255, 212, 95, .72) !important; box-shadow: 0 0 0 1px rgba(255,212,95,.35), 0 8px 22px rgba(255,178,44,.20) !important; }
+
+@media (max-width: 680px) {
+  .game-hero__character .approved-character-sprite { width: 142px; }
+  .role-hero__character .approved-character-sprite { width: 104px; }
+  .approved-squad-hero { min-height: 190px; }
+  .approved-squad-hero__copy { width: 65%; padding: 15px 12px; }
+  .approved-squad-hero h2 { font-size: 26px; }
+  .approved-squad-hero p { font-size: 8px; }
+  .approved-squad-hero__message { margin-top: 10px; padding: 8px; }
+  .approved-squad-hero__character { right:-6px; bottom:-18px; width:132px; }
+  .pitch-player__portrait .approved-character-sprite { width: 38px; margin-top: -7px; }
+}
