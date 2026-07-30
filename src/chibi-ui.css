@@ -1,0 +1,136 @@
+:root {
+  --game-cyan: #36ddff;
+  --game-blue: #1776ff;
+  --game-lime: #c9ff42;
+  --game-gold: #ffd45f;
+  --game-purple: #9b62ff;
+}
+
+.chibi-game-ui body {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(54, 221, 255, .16), transparent 34rem),
+    radial-gradient(circle at 100% 20%, rgba(155, 98, 255, .12), transparent 30rem),
+    linear-gradient(145deg, #040815 0%, #07142a 52%, #050914 100%);
+}
+.chibi-game-ui .sidebar,
+.chibi-game-ui .topbar,
+.chibi-game-ui .context-panel,
+.chibi-game-ui .mobile-nav { background-color: rgba(6, 16, 35, .94); }
+.chibi-game-ui .card,
+.chibi-game-ui .metric-card,
+.chibi-game-ui .dashboard-quick-actions button,
+.chibi-game-ui .region-card {
+  border-color: rgba(143, 202, 255, .17);
+  background: linear-gradient(145deg, rgba(24, 52, 91, .92), rgba(8, 24, 48, .96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 8px 24px rgba(0,0,0,.15);
+}
+.chibi-game-ui .btn--primary {
+  color: #07101d;
+  background: linear-gradient(110deg, var(--game-cyan), var(--game-lime));
+  box-shadow: 0 8px 20px rgba(54,221,255,.16);
+}
+.chibi-game-ui .btn--secondary {
+  border-color: rgba(54,221,255,.3);
+  background: linear-gradient(180deg,#234d80,#17345b);
+}
+.chibi-game-ui .nav__item.is-active { color: var(--game-cyan); background: rgba(54,221,255,.13); }
+
+.character-portrait {
+  --portrait-scale: 1;
+  display: inline-grid;
+  place-items: end center;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 10px 12px rgba(0,0,0,.28));
+}
+.character-portrait svg { display: block; width: calc(100% * var(--portrait-scale)); height: auto; max-height: 100%; overflow: visible; }
+.character-portrait--assistant { --portrait-scale: 1.05; }
+.character-portrait--scout { --portrait-scale: 1.02; }
+.character-portrait--director { --portrait-scale: 1.03; }
+
+.game-hero {
+  position: relative;
+  min-height: 248px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(54,221,255,.34);
+  border-radius: 22px;
+  background: radial-gradient(circle at 82% 14%, rgba(201,255,66,.16), transparent 30%), linear-gradient(135deg,#143964 0%,#0a1a36 58%,#081326 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 18px 40px rgba(0,0,0,.24);
+}
+.game-hero::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  opacity: .27;
+  background-image: linear-gradient(rgba(54,221,255,.12) 1px,transparent 1px), linear-gradient(90deg,rgba(54,221,255,.12) 1px,transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(to bottom,#000,transparent 88%);
+}
+.game-hero__copy { position: relative; z-index: 3; width: 62%; padding: 24px 18px; }
+.game-hero__eyebrow { color: var(--game-lime); font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+.game-hero h2 { margin: 15px 0 7px; max-width: 440px; font-size: clamp(30px,4.4vw,52px); line-height: .96; letter-spacing: -.055em; }
+.game-hero p { margin: 0; color: #bed0e4; font-size: 13px; }
+.game-hero__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.game-hero__actions svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.game-hero__character { position: absolute; z-index: 2; right: 1%; bottom: -4px; width: min(36%,230px); height: 238px; }
+.game-hero__message { position: absolute; z-index: 4; right: 16px; bottom: 16px; width: min(38%,280px); padding: 10px 12px; border: 1px solid rgba(54,221,255,.3); border-radius: 13px 13px 4px 13px; background: rgba(4,13,28,.86); backdrop-filter: blur(10px); }
+.game-hero__message strong,.game-hero__message span { display: block; }
+.game-hero__message strong { color: var(--game-cyan); font-size: 10px; }
+.game-hero__message span { margin-top: 3px; color: #d9e7f5; font-size: 9px; line-height: 1.5; }
+
+.role-hero { position: relative; min-height: 174px; margin-bottom: 14px; overflow: hidden; border: 1px solid rgba(143,202,255,.25); border-radius: 20px; background: linear-gradient(135deg,#152f55,#09172d); }
+.role-hero--scout { border-color: rgba(255,212,95,.32); background: radial-gradient(circle at 85% 10%,rgba(255,212,95,.19),transparent 35%),linear-gradient(135deg,#453215,#121b31); }
+.role-hero--director { border-color: rgba(54,221,255,.27); background: radial-gradient(circle at 90% 12%,rgba(54,221,255,.14),transparent 36%),linear-gradient(135deg,#153b65,#0a172c); }
+.role-hero__copy { position: relative; z-index: 2; width: 70%; padding: 18px 20px; }
+.role-hero h2 { margin: 8px 0 5px; font-size: clamp(23px,3vw,36px); line-height: 1.04; letter-spacing: -.045em; }
+.role-hero p { max-width: 520px; margin: 0 0 12px; color: #9db4cb; font-size: 11px; line-height: 1.6; }
+.role-hero__character { position: absolute; right: 2%; bottom: -8px; width: 155px; height: 170px; }
+
+.chibi-game-ui .pitch-player {
+  overflow: hidden;
+  border: 2px solid rgba(140,216,255,.35);
+  background: linear-gradient(180deg,rgba(38,107,179,.96),rgba(12,33,67,.97));
+  box-shadow: 0 6px 15px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.chibi-game-ui .pitch-player::before { position: absolute; inset: 0; border-radius: inherit; content: ''; pointer-events: none; background: linear-gradient(135deg,rgba(255,255,255,.16),transparent 38%,rgba(201,255,66,.08)); }
+.pitch-player__top,.pitch-player__portrait,.pitch-player__name,.pitch-player__select { position: relative; z-index: 1; }
+.pitch-player__portrait { height: 80px; margin: -1px -4px 2px; overflow: hidden; background: radial-gradient(circle at 50% 20%,rgba(255,255,255,.24),transparent 62%); }
+.pitch-player__portrait .character-portrait { width: 82px; height: 88px; margin: auto; }
+.chibi-game-ui .pitch-player__rating { color: var(--game-gold); text-shadow: 0 1px 5px rgba(0,0,0,.5); }
+.chibi-game-ui .pitch-player__pos { color: #07101d; background: var(--game-lime); }
+.chibi-game-ui .pitch-player__name { color: white; text-shadow: 0 1px 3px #000; }
+.player-avatar.is-chibi { width: 54px; height: 58px; overflow: hidden; padding: 0; border: 1px solid rgba(54,221,255,.3); border-radius: 11px; background: linear-gradient(180deg,#285d9c,#0e274c); }
+.player-avatar.is-chibi .character-portrait { width: 52px; height: 58px; }
+
+.live-assistant { display: grid; grid-template-columns: 72px minmax(0,1fr); align-items: center; gap: 8px; margin: -12px -12px 12px; padding: 8px 12px; border-bottom: 1px solid rgba(143,202,255,.17); background: linear-gradient(100deg,rgba(27,72,119,.9),rgba(9,25,49,.7)); }
+.live-assistant .character-portrait { width: 68px; height: 72px; }
+.live-assistant span,.live-assistant strong,.live-assistant small { display: block; }
+.live-assistant strong { color: var(--game-cyan); font-size: 10px; }
+.live-assistant small { margin-top: 3px; color: #9db4cb; font-size: 8px; line-height: 1.45; }
+
+@media (max-width: 680px) {
+  .game-hero { min-height: 260px; margin-top: -2px; }
+  .game-hero__copy { width: 66%; padding: 16px 12px; }
+  .game-hero h2 { margin-top: 12px; font-size: 29px; }
+  .game-hero p { font-size: 9px; }
+  .game-hero__actions { max-width: 72%; margin-top: 14px; }
+  .game-hero__actions .btn { min-height: 44px; padding: 8px 10px; font-size: 9px; }
+  .game-hero__character { right: -8px; width: 47%; height: 218px; }
+  .game-hero__message { right: 8px; bottom: 8px; width: 51%; padding: 8px; }
+  .role-hero { min-height: 154px; }
+  .role-hero__copy { width: 72%; padding: 14px 12px; }
+  .role-hero h2 { font-size: 23px; }
+  .role-hero p { max-width: 190px; font-size: 8px; }
+  .role-hero__character { right: -5px; width: 126px; height: 150px; }
+  .chibi-game-ui .pitch-player { padding: 2px; }
+  .pitch-player__portrait { height: 43px; margin: 0 -2px 1px; }
+  .pitch-player__portrait .character-portrait { width: 48px; height: 49px; }
+  .chibi-game-ui .pitch-player__top { gap: 1px; }
+  .chibi-game-ui .pitch-player__rating { font-size: 8px; }
+  .chibi-game-ui .pitch-player__pos { padding: 1px 3px; font-size: 6px; }
+  .chibi-game-ui .pitch-player__select { max-height: 20px; padding: 1px; }
+  .live-assistant { grid-template-columns: 58px minmax(0,1fr); }
+  .live-assistant .character-portrait { width: 55px; height: 60px; }
+}

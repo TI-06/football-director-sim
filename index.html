@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#07130f">
+  <meta name="theme-color" content="#07142a">
   <meta name="description" content="戦術・育成・移籍・財務を管理するブラウザサッカー経営シミュレーション">
   <title>Football Director</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/chibi-ui.css">
+  <link rel="stylesheet" href="./src/chibi-ui-mobile.css">
 </head>
 <body>
   <div id="app" aria-live="polite">
@@ -20,5 +22,6 @@
   <div id="modal-root"></div>
   <input id="save-import" type="file" accept="application/json,.json" hidden>
   <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/ui/chibi-bootstrap.js"></script>
 </body>
 </html>
