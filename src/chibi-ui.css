@@ -116,7 +116,7 @@
   .game-hero h2 { margin-top: 12px; font-size: 29px; }
   .game-hero p { font-size: 9px; }
   .game-hero__actions { max-width: 72%; margin-top: 14px; }
-  .game-hero__actions .btn { min-height: 42px; padding: 8px 10px; font-size: 9px; }
+  .game-hero__actions .btn { min-height: 44px; padding: 8px 10px; font-size: 9px; }
   .game-hero__character { right: -8px; width: 47%; height: 218px; }
   .game-hero__message { right: 8px; bottom: 8px; width: 51%; padding: 8px; }
   .role-hero { min-height: 154px; }
