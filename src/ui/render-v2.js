@@ -2,7 +2,7 @@ import {
   renderApplication as renderLegacyApplication,
   renderMatchModal,
   renderNewGame
-} from './render.js';
+} from './render.js?legacy=1';
 import { renderLiveMatchCenterV2 } from './live-match-view-v2.js';
 import { renderDashboardV2, renderScheduleV2, decorateLegacyView } from './mobile-screens-v2.js';
 import { mobileShellV2 } from './mobile-shell-v2.js';
