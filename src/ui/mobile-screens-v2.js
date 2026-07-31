@@ -33,14 +33,18 @@ function fixtureTeams(state, fixture) {
   return { home: clubById(state, fixture.homeId), away: clubById(state, fixture.awayId) };
 }
 
+function hasTransferRequest(player) {
+  return Boolean(player.transferRequest || player.transferRequested);
+}
+
 function urgentItems(state) {
   const players = userPlayers(state);
   const items = [];
   for (const player of players.filter((item) => item.injuryWeeks > 0).slice(0, 2)) {
     items.push({ tone: 'danger', label: '負傷', title: player.name, detail: `復帰まで${player.injuryWeeks}週` });
   }
-  for (const player of players.filter((item) => item.transferRequested || item.happiness < 45).slice(0, 2)) {
-    items.push({ tone: 'warning', label: '不満', title: player.name, detail: player.unhappinessReason || '起用状況を確認' });
+  for (const player of players.filter((item) => hasTransferRequest(item) || item.happiness < 45).slice(0, 2)) {
+    items.push({ tone: 'warning', label: hasTransferRequest(player) ? '移籍希望' : '不満', title: player.name, detail: player.unhappinessReason || player.concerns?.[0] || '起用状況を確認' });
   }
   for (const item of (state.inbox ?? []).filter((entry) => entry.kind === 'decision' && !entry.resolved).slice(0, 3)) {
     items.push({ tone: 'warning', label: '判断', title: item.title, detail: item.category || '受信トレイ' });
@@ -79,13 +83,13 @@ export function renderDashboardV2(state, uiState = {}) {
     <section class="fd2-metrics">
       ${metricTile('現在順位', `${currentPosition(state)}位`, club.divisionName, 'accent')}
       ${metricTile('総合戦力', overall, `平均体力 ${fitness}%`, fitness < 65 ? 'warning' : 'neutral')}
-      ${metricTile('チーム士気', `${morale}%`, players.some((player) => player.transferRequested) ? '移籍希望あり' : '安定', morale < 55 ? 'warning' : 'good')}
+      ${metricTile('チーム士気', `${morale}%`, players.some(hasTransferRequest) ? '移籍希望あり' : '安定', morale < 55 ? 'warning' : 'good')}
       ${metricTile('移籍予算', formatMoney(club.transferBudget), `現金 ${formatMoney(club.cash)}`, 'neutral')}
     </section>
     ${fixture ? matchCard({ fixture, home: teams.home, away: teams.away, userClubId: state.userClubId, detail: `WEEK ${fixture.week}` }) : emptyPanel('次戦はありません', 'シーズン終了または日程確定待ちです。')}
     <section class="fd2-section">
       ${sectionHeader('要対応', '重要度順に最大5件を表示', `<button type="button" data-nav="inbox">すべて見る</button>`)}
-      <div class="fd2-alert-list">${urgent.length ? urgent.map((item) => `<button type="button" data-nav="inbox" class="fd2-alert fd2-alert--${item.tone}">${statusBadge(item.label, item.tone)}<span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></span>${icon('chevron-right', 16)}</button>`).join('') : `<div class="fd2-alert fd2-alert--good">${statusBadge('良好', 'good')}<span><strong>対応が必要な項目はありません</strong><small>編成と次戦準備を確認できます。</small></span></div>`}</div>
+      <div class="fd2-alert-list">${urgent.length ? urgent.map((item) => `<button type="button" data-nav="inbox" class="fd2-alert fd2-alert--${item.tone}">${statusBadge(item.label, item.tone)}<span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></span>${icon('chevron', 16)}</button>`).join('') : `<div class="fd2-alert fd2-alert--good">${statusBadge('良好', 'good')}<span><strong>対応が必要な項目はありません</strong><small>編成と次戦準備を確認できます。</small></span></div>`}</div>
     </section>
     <section class="fd2-section">
       ${sectionHeader('最近の結果', '直近5試合')}
