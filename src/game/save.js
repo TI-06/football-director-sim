@@ -3,7 +3,7 @@ export const SAVE_SCHEMA_VERSION = 4;
 const SAVE_FORMAT = 'football-director-save-v4';
 const SAVE_ENCODING = 'lzw-base64';
 const MAX_CODE = 65_534;
-const LEGACY_SAVE_ERROR = '旧バージョンのセーブデータはこの版では読み込めません。';
+const LEGACY_SAVE_ERROR = '旧バージョンのセーブデータはこの版では読み込めません。 Unsupported save data.';
 
 function bytesToBase64(bytes) {
   let binary = '';
