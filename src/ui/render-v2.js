@@ -8,11 +8,12 @@ import { renderDashboardV2, renderScheduleV2, decorateLegacyView } from './mobil
 import { mobileShellV2 } from './mobile-shell-v2.js';
 
 const VALID_VIEWS = new Set(['dashboard', 'schedule', 'squad', 'transfers', 'tactics', 'academy', 'records', 'secretary', 'club', 'inbox']);
+const LEGACY_MAIN_MARKERS = ['<main class="content">', '<main class="workspace">'];
 
 function extractLegacyWorkspace(html) {
-  const marker = '<main class="workspace">';
+  const marker = LEGACY_MAIN_MARKERS.find((candidate) => html.includes(candidate));
+  if (!marker) return html;
   const start = html.indexOf(marker);
-  if (start < 0) return html;
   const contentStart = start + marker.length;
   const end = html.indexOf('</main>', contentStart);
   return end < 0 ? html.slice(contentStart) : html.slice(contentStart, end);
