@@ -48,8 +48,6 @@ test('a full season completes without duplicate or missing fixtures', () => {
   assert.ok(state.cup.championClubId);
 });
 
-
-
 test('completed season keeps the final table visible after a third-division promotion', () => {
   let state = createNewGame({ ...options, clubId: 'jp3-01', seed: 'full-season' });
   for (let index = 0; index < 44; index += 1) state = playNextWeek(state).state;
@@ -79,7 +77,7 @@ test('save serialization round trip preserves the state', () => {
   assert.ok(serialized.length < JSON.stringify(advanced).length * 0.5);
   const restored = deserializeGame(serialized);
   assert.deepEqual(restored, advanced);
-  assert.throws(() => deserializeGame('{"schemaVersion":999}'), /unsupported|invalid/i);
+  assert.throws(() => deserializeGame('{"schemaVersion":999}'), /旧バージョン|invalid/i);
 });
 
 test('academy receives a deterministic intake every eight completed weeks', () => {

@@ -33,7 +33,8 @@ const importPattern = /(?:from\s+|import\s*)['"](\.\.?\/[^'"]+)['"]/g;
 for (const file of jsFiles) {
   const source = await readFile(file, 'utf8');
   for (const match of source.matchAll(importPattern)) {
-    const target = path.resolve(path.dirname(file), match[1]);
+    const fileSpecifier = match[1].split(/[?#]/, 1)[0];
+    const target = path.resolve(path.dirname(file), fileSpecifier);
     try {
       await stat(target);
     } catch {

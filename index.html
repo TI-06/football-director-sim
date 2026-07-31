@@ -3,14 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#07142a">
+  <meta name="theme-color" content="#06182d">
   <meta name="description" content="戦術・育成・移籍・財務を管理するブラウザサッカー経営シミュレーション">
   <title>Football Director</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/styles.css">
-  <link rel="stylesheet" href="./src/chibi-ui.css">
-  <link rel="stylesheet" href="./src/chibi-ui-mobile.css">
-  <link rel="stylesheet" href="./src/approved-character-art.css">
+  <link rel="stylesheet" href="./src/mobile-game-v2.css">
+  <link rel="stylesheet" href="./src/mobile-game-v2-compat.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "./src/ui/render.js": "./src/ui/render-v2.js",
+        "./src/game/game-engine.js": "./src/game/game-engine-v2.js"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="app" aria-live="polite">
@@ -23,7 +30,6 @@
   <div id="modal-root"></div>
   <input id="save-import" type="file" accept="application/json,.json" hidden>
   <script type="module" src="./src/main.js"></script>
-  <script type="module" src="./src/ui/chibi-bootstrap.js"></script>
-  <script type="module" src="./src/ui/approved-character-art.js"></script>
+  <script type="module" src="./src/ui/mobile-interactions-v2.js"></script>
 </body>
 </html>
