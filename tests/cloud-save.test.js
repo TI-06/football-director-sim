@@ -56,9 +56,9 @@ test('cloud client sends same-origin credentials for register login load save an
   assert.equal(calls.every((call) => call.init.credentials === 'same-origin'), true);
 });
 
-test('schema version three round-trips all club-life scouting match-culture state boundaries', () => {
+test('schema version four round-trips all club-life scouting match-culture state boundaries', () => {
   const state = createNewGame({ clubId: 'jp1-01', seed: 'cloud-schema' });
-  assert.equal(SAVE_SCHEMA_VERSION, 3);
+  assert.equal(SAVE_SCHEMA_VERSION, 4);
   const restored = deserializeGame(serializeGame(state));
   for (const key of ['staff', 'playerPromises', 'boardEvaluation', 'managerProfile', 'scoutingNetwork', 'transferNegotiations', 'loans', 'setPieces', 'rivalries']) assert.ok(key in restored);
 });
