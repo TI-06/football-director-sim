@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createNewGame, prepareNextWeek } from '../src/game/game-engine.js';
 import { createLiveMatchSession, advanceLiveMatchSession } from '../src/game/live-match.js';
 import { SAVE_SCHEMA_VERSION, deserializeGame, serializeGame } from '../src/game/save.js';
-import { moraleDeltaForMatch, seasonTempoWithinTarget } from '../src/game/balance-v2.js';
+import { applyPostMatchBalance, moraleDeltaForMatch, seasonTempoWithinTarget } from '../src/game/balance-v2.js';
 import { characterArt } from '../src/ui/characters-v2.js';
 import { createLivePitchModel } from '../src/ui/live-match-visual-v2.js';
 import { renderApplication, renderLiveMatchCenter } from '../src/ui/render-v2.js';
@@ -70,6 +70,27 @@ test('balance calibration targets five to eight hour seasons', () => {
   assert.equal(seasonTempoWithinTarget(4.9), false);
   assert.equal(moraleDeltaForMatch('win', 8), 5);
   assert.equal(moraleDeltaForMatch('loss', 5.5), -5);
+});
+
+test('post-match balance adds fatigue pressure and dampens repeated win morale growth', () => {
+  const state = createNewGame({ seed: 'balance-v2', clubId: 'jp1-01' });
+  const player = state.players.find((item) => item.clubId === state.userClubId);
+  player.fitness = 80;
+  player.morale = 75;
+  player.selectionPolicy = 'starter-fixed';
+  const report = {
+    homeClubId: state.userClubId,
+    awayClubId: state.clubs.find((club) => club.id !== state.userClubId).id,
+    homeGoals: 2,
+    awayGoals: 0,
+    playerRatings: [{ playerId: player.id, minutes: 90, started: true }]
+  };
+  const calibrated = applyPostMatchBalance(state, report);
+  const nextPlayer = calibrated.players.find((item) => item.id === player.id);
+  assert.equal(nextPlayer.fitness, 77);
+  assert.equal(nextPlayer.morale, 74);
+  assert.equal(calibrated.balanceVersion, 2);
+  assert.equal(player.fitness, 80);
 });
 
 test('mobile style contract includes fixed five-tab navigation and reduced motion', async () => {
