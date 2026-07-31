@@ -38,7 +38,7 @@ export function renderApplication(state, currentView = 'dashboard', uiState = {}
 }
 
 export function renderLiveMatchCenter(state, session) {
-  return renderLiveMatchCenterV2(state, session);
+  return renderLiveMatchCenterV2(state, session).replace('class="fd2-live"', 'class="fd2-live live-match-center"');
 }
 
 export { renderMatchModal, renderNewGame };
