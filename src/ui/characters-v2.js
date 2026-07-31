@@ -1,3 +1,4 @@
+import { escapeHtml } from './templates.js';
 import spritePart1 from './character-sprite/part-1.js';
 import spritePart2 from './character-sprite/part-2.js';
 import spritePart3 from './character-sprite/part-3.js';
@@ -34,19 +35,20 @@ export const CHARACTERS_V2 = Object.freeze({
 export function characterArt(key, { className = '', compact = false, eager = false } = {}) {
   const character = CHARACTERS_V2[key];
   if (!character) return '';
-  const classes = ['fd2-character', compact ? 'fd2-character--compact' : '', className].filter(Boolean).join(' ');
-  return `<span class="${classes}" role="img" aria-label="${character.role} ${character.name}" style="--fd2-character-image:url('${SPRITE_DATA}');--fd2-character-position:${character.position}" data-character="${key}" data-loading="${eager ? 'eager' : 'lazy'}"></span>`;
+  const classes = ['fd2-character', compact ? 'fd2-character--compact' : '', className].filter(Boolean).map(escapeHtml).join(' ');
+  return `<span class="${classes}" role="img" aria-label="${escapeHtml(`${character.role} ${character.name}`)}" style="--fd2-character-image:url('${SPRITE_DATA}');--fd2-character-position:${character.position}" data-character="${escapeHtml(key)}" data-loading="${eager ? 'eager' : 'lazy'}"></span>`;
 }
 
 export function characterHero(key, { eyebrow = '', title = '', body = '', message = '' } = {}) {
   const character = CHARACTERS_V2[key];
   if (!character) return '';
-  return `<section class="fd2-character-hero fd2-character-hero--${key}">
+  const resolvedMessage = message || character.message;
+  return `<section class="fd2-character-hero fd2-character-hero--${escapeHtml(key)}">
     <div class="fd2-character-hero__copy">
-      ${eyebrow ? `<span class="fd2-eyebrow">${eyebrow}</span>` : ''}
-      <h2>${title}</h2>
-      <p>${body}</p>
-      <div class="fd2-character-hero__message"><strong>${character.role} ${character.name}</strong><span>${message || character.message}</span></div>
+      ${eyebrow ? `<span class="fd2-eyebrow">${escapeHtml(eyebrow)}</span>` : ''}
+      <h2>${escapeHtml(title)}</h2>
+      <p>${escapeHtml(body)}</p>
+      <div class="fd2-character-hero__message"><strong>${escapeHtml(`${character.role} ${character.name}`)}</strong><span>${escapeHtml(resolvedMessage)}</span></div>
     </div>
     <div class="fd2-character-hero__art">${characterArt(key, { eager: true })}</div>
   </section>`;
