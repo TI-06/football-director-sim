@@ -3,7 +3,7 @@ export const SAVE_SCHEMA_VERSION = 4;
 const SAVE_FORMAT = 'football-director-save-v4';
 const SAVE_ENCODING = 'lzw-base64';
 const MAX_CODE = 65_534;
-const LEGACY_SAVE_ERROR = '旧バージョンのセーブデータはこの版では読み込めません。 Unsupported save data.';
+const LEGACY_SAVE_ERROR = '旧バージョンのセーブデータはこの版では読み込めません。';
 
 function bytesToBase64(bytes) {
   let binary = '';
@@ -126,7 +126,7 @@ export function deserializeGame(text) {
       parsed = JSON.parse(decompressLzw(parsed.data));
     }
   } catch (error) {
-    if (/旧バージョン|Unsupported/.test(error?.message ?? '')) throw error;
+    if (/旧バージョン/.test(error?.message ?? '')) throw error;
     throw new Error('Invalid save data.');
   }
   return validateState(parsed);
