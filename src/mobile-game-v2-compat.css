@@ -68,3 +68,36 @@
     box-sizing: border-box;
   }
 }
+
+@media (max-width: 390px) {
+  .fd2-legacy-panel--squad .pitch-slot {
+    width: 40px !important;
+  }
+
+  .fd2-legacy-panel--squad .pitch-player {
+    min-height: 42px;
+    max-height: 42px;
+    overflow: hidden;
+    padding: 4px 3px;
+    border-radius: 11px;
+  }
+
+  .fd2-legacy-panel--squad .pitch-player__top {
+    grid-template-columns: 1fr auto;
+    gap: 2px;
+  }
+
+  .fd2-legacy-panel--squad .pitch-player__roles,
+  .fd2-legacy-panel--squad .pitch-player__name,
+  .fd2-legacy-panel--squad .pitch-player__select {
+    display: none !important;
+  }
+
+  .fd2-legacy-panel--squad .pitch-player__pos {
+    font-size: 7px;
+  }
+
+  .fd2-legacy-panel--squad .pitch-player__rating {
+    font-size: 10px;
+  }
+}
