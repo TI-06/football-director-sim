@@ -50,9 +50,9 @@ function createDropEvent(playerId) {
 function placeSelectedPlayer(slot) {
   if (!selectedSquadPlayerId || !slot.dataset.dropSlot) return false;
   const playerId = selectedSquadPlayerId;
-  const dispatched = slot.dispatchEvent(createDropEvent(playerId));
+  slot.dispatchEvent(createDropEvent(playerId));
   clearSquadSelection();
-  return dispatched;
+  return true;
 }
 
 document.addEventListener('click', (event) => {
