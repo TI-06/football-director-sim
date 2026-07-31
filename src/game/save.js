@@ -1,8 +1,9 @@
-export const SAVE_SCHEMA_VERSION = 3;
+export const SAVE_SCHEMA_VERSION = 4;
 
-const SAVE_FORMAT = 'football-director-save';
+const SAVE_FORMAT = 'football-director-save-v4';
 const SAVE_ENCODING = 'lzw-base64';
 const MAX_CODE = 65_534;
+const LEGACY_SAVE_ERROR = '旧バージョンのセーブデータはこの版では読み込めません。';
 
 function bytesToBase64(bytes) {
   let binary = '';
@@ -95,7 +96,7 @@ function decompressLzw(value) {
 
 function validateState(parsed) {
   if (!parsed || typeof parsed !== 'object') throw new Error('Invalid save data.');
-  if (parsed.schemaVersion !== SAVE_SCHEMA_VERSION) throw new Error('Unsupported save schema version.');
+  if (parsed.schemaVersion !== SAVE_SCHEMA_VERSION) throw new Error(LEGACY_SAVE_ERROR);
   const requiredArrays = ['clubs', 'players', 'academy', 'fixtures', 'inbox', 'matchReports', 'staff', 'playerPromises', 'transferNegotiations', 'loans', 'rivalries'];
   if (requiredArrays.some((key) => !Array.isArray(parsed[key]))) throw new Error('Invalid save data structure.');
   if (!parsed.userClubId || !parsed.tactics || !parsed.lineup || !parsed.cup || !parsed.standingsByDivision || !parsed.boardEvaluation || !parsed.managerProfile || !parsed.scoutingNetwork || !parsed.setPieces) throw new Error('Invalid save data structure.');
@@ -117,14 +118,15 @@ export function deserializeGame(text) {
   let parsed;
   try {
     parsed = typeof text === 'string' ? JSON.parse(text) : structuredClone(text);
+    if (parsed?.format && parsed.format !== SAVE_FORMAT) throw new Error(LEGACY_SAVE_ERROR);
     if (parsed?.format === SAVE_FORMAT) {
       if (parsed.schemaVersion !== SAVE_SCHEMA_VERSION || parsed.encoding !== SAVE_ENCODING || typeof parsed.data !== 'string') {
-        throw new Error('Unsupported save encoding.');
+        throw new Error(LEGACY_SAVE_ERROR);
       }
       parsed = JSON.parse(decompressLzw(parsed.data));
     }
   } catch (error) {
-    if (/Unsupported/.test(error?.message ?? '')) throw error;
+    if (/旧バージョン|Unsupported/.test(error?.message ?? '')) throw error;
     throw new Error('Invalid save data.');
   }
   return validateState(parsed);
