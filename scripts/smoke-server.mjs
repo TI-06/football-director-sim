@@ -19,7 +19,9 @@ try {
   const checks = [
     ['/', 'Football Director'],
     ['/src/styles.css', '.app-shell'],
-    ['/src/main.js', "import { boot }"],
+    ['/src/mobile-game-v2.css', '.fd2-shell'],
+    ['/src/main.js', "await import('./ui/controller.js')"],
+    ['/src/ui/render-v2.js', 'renderDashboardV2'],
     ['/src/game/game-engine.js', 'createNewGame'],
     ['/assets/favicon.svg', '<svg']
   ];
