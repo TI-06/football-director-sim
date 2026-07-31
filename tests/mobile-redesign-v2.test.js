@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createNewGame, prepareNextWeek } from '../src/game/game-engine.js';
+import { playNextWeek as playNextWeekV2 } from '../src/game/game-engine-v2.js';
 import { createLiveMatchSession, advanceLiveMatchSession } from '../src/game/live-match.js';
 import { SAVE_SCHEMA_VERSION, deserializeGame, serializeGame } from '../src/game/save.js';
 import { applyPostMatchBalance, moraleDeltaForMatch, seasonTempoWithinTarget } from '../src/game/balance-v2.js';
@@ -91,6 +92,14 @@ test('post-match balance adds fatigue pressure and dampens repeated win morale g
   assert.equal(nextPlayer.morale, 74);
   assert.equal(calibrated.balanceVersion, 2);
   assert.equal(player.fitness, 80);
+});
+
+test('calibrated weekly progression applies balance after the actual user match', () => {
+  const state = createNewGame({ seed: 'balance-wrapper-v2', clubId: 'jp1-01' });
+  const result = playNextWeekV2(state);
+  assert.equal(result.ok, true);
+  assert.ok(result.matchReport);
+  assert.equal(result.state.balanceVersion, 2);
 });
 
 test('mobile style contract includes fixed five-tab navigation and reduced motion', async () => {
