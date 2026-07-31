@@ -3,7 +3,7 @@ import { createLivePitchModel } from './live-match-visual-v2.js';
 import { clubBadge, escapeHtml, icon } from './templates.js';
 
 const TACTIC_OPTIONS = Object.freeze({
-  formation: { '4-3-3': '4-3-3', '4-2-3-1': '4-2-3-1', '4-4-2': '4-4-2', '3-4-2-1': '3-4-2-1', '3-5-2': '3-5-2' },
+  formation: { '4-3-3': '4-3-3', '4-2-3-1': '4-2-3-1', '4-4-2': '4-4-2', '3-4-2-1': '3-4-2-1', '5-3-2': '5-3-2' },
   mentality: { defensive: '守備的', cautious: '慎重', balanced: 'バランス', positive: '前向き', attacking: '攻撃的' },
   pressing: { low: '低い', normal: '標準', high: '高い', 'very-high': '非常に高い' },
   tempo: { slow: '遅い', normal: '標準', fast: '速い' },
@@ -86,7 +86,7 @@ export function renderLiveMatchCenterV2(state, session) {
       <aside class="fd2-live__decision">
         <div class="fd2-assistant-callout">${characterArt('mina', { compact: true })}<div><strong>ミナの提案</strong><span>${finished ? '試合結果を確定できます。' : session.minute >= 75 ? '終盤です。攻守の優先順位を決めましょう。' : session.minute >= 60 ? '疲労と評価を見て交代を検討できます。' : session.minute >= 45 ? '前半の内容を踏まえて戦術を調整できます。' : '基本は自動進行です。重要局面だけ判断できます。'}</span></div></div>
         <details class="fd2-live-details" ${finished ? '' : 'open'}><summary>戦術調整</summary><div class="fd2-live-controls">${Object.keys(TACTIC_OPTIONS).map((key) => liveSelect(key, tactics[key])).join('')}</div></details>
-        <details class="fd2-live-details"><summary>選手交代 ${user.substitutionsUsed}/5</summary><div class="fd2-substitution"><label><span>交代する選手</span><select data-live-player-out>${lineupOptions}</select></label><label><span>投入する選手</span><select data-live-player-in>${benchOptions}</select></label><button type="button" data-command="live-substitute" ${finished || user.substitutionsUsed >= 5 || !benchOptions ? 'disabled' : ''}>${icon('swap', 17)} 交代を実行</button></div></details>
+        <details class="fd2-live-details"><summary>選手交代 ${user.substitutionsUsed}/5</summary><div class="fd2-substitution"><label><span>交代する選手</span><select data-live-player-out>${lineupOptions}</select></label><label><span>投入する選手</span><select data-live-player-in>${benchOptions}</select></label><button type="button" data-command="live-substitute" ${finished || user.substitutionsUsed >= 5 || !benchOptions ? 'disabled' : ''}>${icon('transfer', 17)} 交代を実行</button></div></details>
         <div class="fd2-live-actions">
           ${finished ? `<button class="fd2-live-primary" type="button" data-command="live-finish">結果を確定</button>` : `<button type="button" data-command="live-skip">結果まで</button><button class="fd2-live-primary" type="button" data-command="live-advance">次の判断まで</button>`}
         </div>
