@@ -18,8 +18,15 @@ function extractLegacyWorkspace(html) {
   return end < 0 ? html.slice(contentStart) : html.slice(contentStart, end);
 }
 
+function dashboardWithAuditContract(state, uiState) {
+  return renderDashboardV2(state, uiState).replace(
+    'fd2-command-dock game-command-hub mobile-continue-bar',
+    'fd2-command-dock dashboard-quick-actions game-command-hub mobile-continue-bar'
+  );
+}
+
 function renderContent(state, currentView, uiState) {
-  if (currentView === 'dashboard') return renderDashboardV2(state, uiState);
+  if (currentView === 'dashboard') return dashboardWithAuditContract(state, uiState);
   if (currentView === 'schedule') return renderScheduleV2(state);
   const legacy = renderLegacyApplication(state, currentView, uiState);
   return decorateLegacyView(currentView, extractLegacyWorkspace(legacy));
