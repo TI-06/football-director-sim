@@ -1,0 +1,47 @@
+.fd2-desktop-nav {
+  display: none;
+}
+
+@media (min-width: 760px) {
+  .fd2-nav {
+    display: none !important;
+  }
+
+  .fd2-desktop-nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 95;
+    display: flex;
+    width: 92px;
+    padding: 78px 8px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    overflow-y: auto;
+    border-right: 1px solid var(--fd2-line);
+    background: rgba(3, 16, 32, .96);
+    box-sizing: border-box;
+    backdrop-filter: blur(18px);
+  }
+
+  .fd2-desktop-nav__item {
+    display: flex;
+    min-height: 58px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border: 0;
+    border-radius: 13px;
+    background: transparent;
+    color: #7897b7;
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .fd2-desktop-nav__item.is-active {
+    background: linear-gradient(180deg, rgba(44, 143, 255, .22), rgba(44, 143, 255, .06));
+    color: #fff;
+    box-shadow: inset 3px 0 0 var(--fd2-cyan-400);
+  }
+}
