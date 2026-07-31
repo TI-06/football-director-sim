@@ -44,4 +44,17 @@
     color: #fff;
     box-shadow: inset 3px 0 0 var(--fd2-cyan-400);
   }
+
+  .fd2-main {
+    padding-bottom: 96px;
+  }
+
+  .fd2-command-dock.dashboard-quick-actions {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 110;
+    width: min(430px, calc(100vw - 128px));
+    box-sizing: border-box;
+  }
 }
