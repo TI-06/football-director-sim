@@ -42,6 +42,14 @@ test('mobile application renders five primary navigation actions and dashboard c
   assert.match(html, /data-character="mina"/);
 });
 
+test('secondary screens embed only the legacy workspace and not a second application shell', () => {
+  const state = createNewGame({ seed: 'single-shell-v2', clubId: 'jp1-01' });
+  const html = renderApplication(state, 'tactics');
+  assert.equal((html.match(/class="fd2-shell app-shell"/g) ?? []).length, 1);
+  assert.equal((html.match(/<main class="fd2-main content"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /app-shell--three-column/);
+});
+
 test('vertical live pitch renders 22 lightweight numbered tokens and event model', () => {
   const state = createNewGame({ seed: 'live-v2', clubId: 'jp1-01' });
   const prepared = prepareNextWeek(state);
