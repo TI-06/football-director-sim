@@ -13,11 +13,14 @@ test('character portrait renders role and tone specific chibi markup', () => {
   assert.match(scout, /circle cx="37" cy="48"/);
 });
 
-test('index loads the game character enhancement assets', () => {
+test('index loads the redesigned mobile game assets instead of post-render enhancements', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /src\/chibi-ui\.css/);
-  assert.match(html, /src\/ui\/chibi-bootstrap\.js/);
-  assert.match(html, /theme-color" content="#07142a"/);
+  assert.match(html, /src\/mobile-game-v2\.css/);
+  assert.match(html, /src\/ui\/mobile-interactions-v2\.js/);
+  assert.match(html, /src\/ui\/render-v2\.js/);
+  assert.match(html, /theme-color" content="#06182d"/);
+  assert.doesNotMatch(html, /src\/ui\/chibi-bootstrap\.js/);
+  assert.doesNotMatch(html, /src\/ui\/approved-character-art\.js/);
 });
 
 test('character stylesheet defines approved mobile hero and face-card layout', () => {
