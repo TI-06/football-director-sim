@@ -1,0 +1,22 @@
+name: Export club life base
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        shell: bash
+        run: tar --exclude=.git --exclude=.github/workflows/export-club-life-base.yml -czf /tmp/football-director-club-life-base.tgz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: football-director-club-life-base
+          path: /tmp/football-director-club-life-base.tgz
+          retention-days: 1
