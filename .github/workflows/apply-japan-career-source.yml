@@ -1,0 +1,40 @@
+name: Apply verified Japanese career source
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply-source:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/japan-career-phase1-2
+          fetch-depth: 0
+
+      - name: Verify and restore source
+        shell: bash
+        run: |
+          cat .source-japan/chunk* | base64 --decode > /tmp/japan-career-source.tgz
+          echo "581892d6596eba71d38b026e0d5175b9c29ac5de525b8cf5a9f7c1966c43f92f  /tmp/japan-career-source.tgz" | sha256sum --check --strict
+          tar -xzf /tmp/japan-career-source.tgz -C .
+          rm -rf .source-japan
+
+      - name: Verify application
+        run: npm run verify && npm run build && git diff --check
+
+      - name: Commit verified feature
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add Japanese three-tier long-term career"
+          git push origin HEAD:feature/japan-career-phase1-2
